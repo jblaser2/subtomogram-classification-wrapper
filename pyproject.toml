@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "subtomogram-classification-wrapper"
+version = "0.1.0.dev0"
+description = "Run subtomogram classification across many cryoET packages with one config, and compare the results."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Josh Blaser" }]
+keywords = ["cryoet", "subtomogram-averaging", "classification", "structural-biology"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "scikit-learn>=1.2",
+    "mrcfile>=1.4",
+    "pydantic>=2.5",
+    "typer>=0.12",
+    "rich>=13.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+preview = []  # the preview-mode ports use only numpy/scipy/sklearn/mrcfile, already core deps
+viz = ["matplotlib>=3.7"]
+dev = ["pytest>=8.0", "pytest-cov", "ruff", "mypy"]
+all = ["subtomogram-classification-wrapper[viz,dev]"]
+
+[project.urls]
+Homepage = "https://github.com/jblaser2/subtomogram-classification-wrapper"
+Issues = "https://github.com/jblaser2/subtomogram-classification-wrapper/issues"
+
+[project.scripts]
+stw = "stw.cli.main:app"
+
+[project.entry-points."stw.adapters"]
+hac = "stw.adapters.hac:HACBaselineAdapter"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/stw"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "native: requires a real installed cryoET package (run manually via `stw selftest --native`)",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "B008",  # typer's `= typer.Option(...)` default-value idiom requires a call in the signature
+    "B905",  # our zip() calls are all between same-length structures built together just above
+]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true

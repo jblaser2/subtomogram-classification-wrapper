@@ -1,0 +1,8 @@
+particles: ../tests/fixtures/tiny
+pattern: "particle_*.mrc"
+k: 2
+mask:
+  kind: auto
+alignment_state: fine
+packages: [hac]
+out_dir: ../.smoke_out
