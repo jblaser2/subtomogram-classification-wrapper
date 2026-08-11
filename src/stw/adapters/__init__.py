@@ -16,8 +16,14 @@ def _load_builtins() -> None:
     if _BUILTIN:
         return
     from stw.adapters.hac import HACBaselineAdapter
+    from stw.adapters.preview.dynamo_py import DynamoPreviewAdapter
+    from stw.adapters.preview.protomo_py import ProtomoPreviewAdapter
+    from stw.adapters.preview.pytom_py import PyTomPreviewAdapter
 
     _BUILTIN["hac"] = HACBaselineAdapter
+    _BUILTIN["dynamo-preview"] = DynamoPreviewAdapter
+    _BUILTIN["pytom-preview"] = PyTomPreviewAdapter
+    _BUILTIN["protomo-preview"] = ProtomoPreviewAdapter
 
 
 def registry() -> dict[str, type[Adapter]]:
@@ -37,3 +43,24 @@ def get_adapter(name: str) -> type[Adapter]:
         available = ", ".join(sorted(reg)) or "(none registered)"
         raise KeyError(f"unknown package {name!r}. Available: {available}")
     return reg[name]
+
+
+def get_adapter_for_mode(name: str, mode: str) -> type[Adapter]:
+    """Resolves a package name against the requested run mode.
+
+    `mode="preview"` prefers a `<name>-preview` adapter when one is
+    registered (falling back to the bare name if not — e.g. HAC Baseline has
+    no separate preview variant, it's already fast). `mode="native"` always
+    uses the bare name, so once a real native adapter for "dynamo"/"pytom"/
+    "protomo" lands (later milestones), `mode="native"` keeps resolving to
+    it — the `-preview` suffix never collides with a native adapter's name.
+    """
+    reg = registry()
+    if mode == "preview":
+        preview_name = f"{name}-preview"
+        if preview_name in reg:
+            return reg[preview_name]
+    if name in reg:
+        return reg[name]
+    available = ", ".join(sorted(reg)) or "(none registered)"
+    raise KeyError(f"unknown package {name!r} for mode={mode!r}. Available: {available}")

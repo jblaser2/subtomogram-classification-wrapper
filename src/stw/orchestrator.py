@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from stw import __version__
-from stw.adapters import get_adapter
+from stw.adapters import get_adapter_for_mode
 from stw.compare import ComparisonReport, PackageLabels, build_comparison
 from stw.config import RunConfig
 from stw.masks.resolve import resolve_mask
@@ -86,7 +86,7 @@ def run_config(config: RunConfig, *, progress: ProgressSink | None = None, dry_r
     results: list[PackageResult] = []
 
     for package in config.packages:
-        adapter_cls = get_adapter(package)
+        adapter_cls = get_adapter_for_mode(package, config.mode)
         report = adapter_cls.check_installed()
         preflight.append(report)
 
@@ -95,7 +95,9 @@ def run_config(config: RunConfig, *, progress: ProgressSink | None = None, dry_r
                 if not report.installed:
                     if config.on_missing_requirement == "fail":
                         raise RuntimeError(f"{package}: missing requirements — {report.to_dict()}")
-                    results.append(PackageResult(package=package, k=k, seed=seed, status="missing_requirements"))
+                    results.append(PackageResult(
+                        package=adapter_cls.name, k=k, seed=seed, status="missing_requirements",
+                    ))
                     continue
 
                 incompatibilities = adapter_cls.validate_job_config(
@@ -106,7 +108,7 @@ def run_config(config: RunConfig, *, progress: ProgressSink | None = None, dry_r
                 warnings = [i.message for i in incompatibilities if i.severity == "warning"]
                 if errors:
                     results.append(PackageResult(
-                        package=package, k=k, seed=seed, status="incompatible",
+                        package=adapter_cls.name, k=k, seed=seed, status="incompatible",
                         error="; ".join(e.message for e in errors), warnings=warnings,
                     ))
                     continue
@@ -114,7 +116,7 @@ def run_config(config: RunConfig, *, progress: ProgressSink | None = None, dry_r
                 workdir = out_dir / package / f"k{k}" / f"seed{seed:02d}"
                 cache_dir = out_dir / package / "_cache"
                 job = Job(
-                    package=package, particles=particles, mask_path=mask_path, mask_spec=mask_spec,
+                    package=adapter_cls.name, particles=particles, mask_path=mask_path, mask_spec=mask_spec,
                     wedge=wedge_spec, alignment_state=config.alignment_state, k=k, seed=seed,
                     workdir=workdir, cache_dir=cache_dir, options=config.package_options.get(package, {}),
                 )
@@ -123,7 +125,7 @@ def run_config(config: RunConfig, *, progress: ProgressSink | None = None, dry_r
                 if dry_run:
                     steps = adapter.plan(job)
                     results.append(PackageResult(
-                        package=package, k=k, seed=seed, status="skipped", warnings=warnings,
+                        package=adapter_cls.name, k=k, seed=seed, status="skipped", warnings=warnings,
                         provenance={"planned_steps": [s.name for s in steps]},
                     ))
                     continue

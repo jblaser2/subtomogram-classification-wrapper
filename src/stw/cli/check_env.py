@@ -52,3 +52,5 @@ def check_env(
             console.print("  (no external requirements)")
         for note in r.degraded:
             console.print(f"  [yellow]degraded:[/yellow] {note}")
+        for note in r.notes:
+            console.print(f"  [cyan]note:[/cyan] {note}")

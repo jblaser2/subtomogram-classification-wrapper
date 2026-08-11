@@ -30,6 +30,24 @@ invalidate any comparison between packages that did and didn't get it.
 If you supply `wedge.kind: per_particle`, it is currently accepted and stored
 for provenance but used by **zero** adapters at this stage.
 
+## `mode: preview`
+
+`dynamo-preview`, `pytom-preview`, and `protomo-preview` are lightweight,
+dependency-free Python approximations of each package's real classifier, not
+the real packages. Their measured fidelity varies a lot:
+
+- **`pytom-preview`** is the most faithful (closely matches real PyTom on
+  FM_easy-like data) but only validated at k=2, and is explicitly *bimodal* on
+  T4P-like data — roughly 2 in 5 seeds collapse to a near-chance split.
+- **`dynamo-preview`** is mid-pack fidelity.
+- **`protomo-preview`** is the weakest — a rough, directionally-informative
+  substitute, not a stand-in for real ProTomo's numbers (ProTomo ships no
+  source, so this port was built by inference only).
+
+Every preview adapter surfaces its own caveat via `stw check-env` (as a note)
+and on every run (as a warning in the run report), so it's never silently
+presented as equivalent to the real package.
+
 ## Ground truth and scoring
 
 Real data usually has no ground truth. `stw`'s scoring module

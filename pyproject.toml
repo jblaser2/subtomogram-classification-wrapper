@@ -44,6 +44,9 @@ stw = "stw.cli.main:app"
 
 [project.entry-points."stw.adapters"]
 hac = "stw.adapters.hac:HACBaselineAdapter"
+dynamo-preview = "stw.adapters.preview.dynamo_py:DynamoPreviewAdapter"
+pytom-preview = "stw.adapters.preview.pytom_py:PyTomPreviewAdapter"
+protomo-preview = "stw.adapters.preview.protomo_py:ProtomoPreviewAdapter"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/stw"]
@@ -57,6 +60,10 @@ markers = [
 [tool.ruff]
 line-length = 120
 target-version = "py310"
+# Vendored verbatim from the STA benchmark project (see adapters/resources/README.md) —
+# deliberately not reformatted/"improved" here; their fidelity numbers are measured
+# against the exact code as vendored.
+extend-exclude = ["src/stw/adapters/resources/*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

@@ -3,17 +3,22 @@
 Full architecture rationale lives in the project's design plan (author's local notes); this
 file tracks the public milestone sequence.
 
-- **M0 — scaffolding + generalized core.** Config/spec types, mask primitives (sphere +
+- [x] **M0 — scaffolding + generalized core.** Config/spec types, mask primitives (sphere +
   cylinder), generic class-averaging, cross-package comparison math, the
-  requirements/capabilities framework, `stw check-env`/`list`/`init`. *Done when CI is green
-  with unit tests and no external cryoET software installed.*
-- **M1 — end-to-end with HAC Baseline only.** Locks the `Adapter` contract before a second
-  package is added. *Done when `stw run` on a tiny fixture produces predictions, class
-  averages, a comparison report, and a run report; `--dry-run`/`--resume` work; a broken job
-  doesn't abort the batch.*
-- **M2 — preview mode.** Three lightweight, dependency-free Python ports (approximating
-  Dynamo/PyTom/ProTomo) wired up as adapters — a multi-method demo that needs zero native
-  installs.
+  requirements/capabilities framework, `stw check-env`/`list`/`init`. CI green with unit tests
+  and no external cryoET software installed.
+- [x] **M1 — end-to-end with HAC Baseline only.** Locks the `Adapter` contract before a second
+  package is added. `stw run` on the tiny fixture produces predictions, class averages, a
+  comparison report, and a run report; `--dry-run`/resume-via-cache work; a broken/incompatible
+  job doesn't abort the batch.
+- [x] **M2 — preview mode.** Three lightweight, dependency-free Python ports (approximating
+  Dynamo/PyTom/ProTomo — `dynamo-preview`/`pytom-preview`/`protomo-preview`) wired up as
+  adapters. A 4-method comparison (with HAC Baseline) runs end to end and in CI with zero
+  native installs. `mode: preview` in a config auto-resolves a bare package name (`dynamo`) to
+  its `-preview` variant; `mode: native` never does, so this stays forward-compatible once a
+  real native adapter for the same name lands. Each preview adapter surfaces its measured
+  fidelity/limitations as a `check-env` note and a run-time warning — see the module docstrings
+  in `src/stw/adapters/preview/`.
 - **M3 — EMAN2**, the first real native pilot (conda-installable, no GPU/MATLAB/license).
 - **M4 — PyTom** + a Tier A/B Docker image bundling every conda-installable package.
 - **M5 — v0.1 release**: PyPI + conda-forge, docs site, `docs/limitations.md` finalized.

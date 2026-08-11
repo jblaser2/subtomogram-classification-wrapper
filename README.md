@@ -4,8 +4,10 @@ Run subtomogram classification across many cryoET packages with **one config**, 
 class averages + a cross-package comparison matrix back — without installing and learning
 each package's own CLI, file formats, and quirks one at a time.
 
-> **Status: early development (pre-v0.1).** The core library and a first pilot package
-> (HAC Baseline) are being built out. See [`ROADMAP.md`](ROADMAP.md) for the full plan and
+> **Status: early development (pre-v0.1).** The core library, HAC Baseline, and three
+> dependency-free `mode: preview` adapters (`dynamo-preview`/`pytom-preview`/`protomo-preview`)
+> work end to end — try `stw list`. Real native packages (EMAN2 next) are still being wired
+> up. See [`ROADMAP.md`](ROADMAP.md) for the full plan and
 > [`docs/limitations.md`](docs/limitations.md) for what this tool does and doesn't do yet.
 
 ## Why
@@ -33,8 +35,10 @@ $ stw run config.yaml       # runs every requested package, writes class average
 ## Design principles
 
 - **Native packages by default.** `stw` shells out to each package's real implementation.
-  A `mode: preview` option exists for a few packages with fast, dependency-light Python
-  ports, but it is opt-in, not the default — see [`docs/limitations.md`](docs/limitations.md).
+  `mode: preview` runs fast, dependency-light Python approximations instead (currently
+  Dynamo/PyTom/ProTomo) — useful for trying the tool with zero installs, but opt-in, not the
+  default, and each one reports its own measured fidelity via `stw check-env` — see
+  [`docs/limitations.md`](docs/limitations.md).
 - **See requirements before you opt in.** Every package declares what it needs (a conda
   env, MATLAB + a specific toolbox, a GPU, disk space, ...); `stw check-env` reports pass/fail
   for each *before* anything runs, so you can opt out of packages you can't support.
