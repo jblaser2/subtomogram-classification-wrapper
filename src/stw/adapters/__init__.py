@@ -20,12 +20,14 @@ def _load_builtins() -> None:
     from stw.adapters.preview.dynamo_py import DynamoPreviewAdapter
     from stw.adapters.preview.protomo_py import ProtomoPreviewAdapter
     from stw.adapters.preview.pytom_py import PyTomPreviewAdapter
+    from stw.adapters.pytom import PyTomAdapter
 
     _BUILTIN["hac"] = HACBaselineAdapter
     _BUILTIN["dynamo-preview"] = DynamoPreviewAdapter
     _BUILTIN["pytom-preview"] = PyTomPreviewAdapter
     _BUILTIN["protomo-preview"] = ProtomoPreviewAdapter
     _BUILTIN["eman2"] = EMAN2Adapter
+    _BUILTIN["pytom"] = PyTomAdapter
 
 
 def registry() -> dict[str, type[Adapter]]:

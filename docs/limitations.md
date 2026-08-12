@@ -27,8 +27,19 @@ for every package — several of which are closed-source binaries — would mean
 changing the *input data* rather than the method, which would silently
 invalidate any comparison between packages that did and didn't get it.
 
+**PyTom is the one adapter with a real, verified wedge pass-through**:
+`wedge.kind: uniform` bakes a real `SingleTiltWedge` (PyTom's own model) into
+its particle-list XML at prep time. Leaving wedge unset does **not** fall
+back to PyTom's own script default (a generic 30-degree wedge) — `stw`
+assumes full (0-degree) coverage instead, since silently guessing a tilt
+geometry you never stated would be worse than assuming none. HAC Baseline,
+EMAN2, and every `preview` adapter ignore wedge info entirely (`wedge: {none}`)
+and warn if you supply any.
+
 If you supply `wedge.kind: per_particle`, it is currently accepted and stored
-for provenance but used by **zero** adapters at this stage.
+for provenance but used by **zero** adapters at this stage — including PyTom,
+whose `SingleTiltWedge` model is a single wedge angle shared by every
+particle, not a true per-particle geometry.
 
 ## `mode: preview`
 

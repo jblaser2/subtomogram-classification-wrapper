@@ -1,0 +1,27 @@
+name: stw-pytom
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - "numpy<2"
+  - scipy
+  - matplotlib
+  - mrcfile
+  - tqdm
+  - boost
+  - fftw[build=*openmpi*]
+  - numba
+  - lxml
+  - openmpi
+  - openmpi-mpicc
+  - openmpi-mpicxx
+  - openmpi-mpifort
+  - mpi4py
+  - swig
+  - scikit-image
+  - joblib
+  - gcc
+  - make
+  - pip
+  - pip:
+      - pytom

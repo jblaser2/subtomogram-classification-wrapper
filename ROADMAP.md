@@ -27,8 +27,19 @@ file tracks the public milestone sequence.
   true split exactly (ARI=1.0), k=3 gives a non-degenerate split, and a cached second run is
   ~2.4x faster than the first. `seed` here is a run index (EMAN2's own CLI exposes no
   `random_state`), matching the same caveat already documented for `pytom-preview`.
-- **M4 — PyTom** + a Tier A/B Docker image bundling every conda-installable package.
-- **M5 — v0.1 release**: PyPI + conda-forge, docs site, `docs/limitations.md` finalized.
+- [x] **M4 — PyTom**, real (not preview): drives real `auto_focus_classify_nofrm.py` via
+  `mpirun` inside a `pytom_env` conda env, an iterative reference-pair difference-map
+  classifier. The first adapter with a genuinely working missing-wedge pass-through —
+  `wedge.kind: uniform` bakes a real `SingleTiltWedge` into PyTom's particle-list XML,
+  verified by round-tripping two different tilt-range configs to two distinct correctly-angled
+  cached XMLs. Verified end-to-end against a real installed `pytom_env`: k=2 recovers the
+  fixture's true split exactly (ARI=1.0). Caught and fixed a real caching bug along the way
+  (in both this adapter and EMAN2's): the native-format mask conversion was cached by
+  existence only, not keyed to the mask's own content hash, so changing masks across runs
+  sharing an `out_dir` would have silently reused a stale converted mask. Still missing a
+  Tier A/B Docker image bundling every conda-installable package — folded into M5.
+- **M5 — v0.1 release**: Tier A/B Docker image, PyPI + conda-forge, docs site,
+  `docs/limitations.md` finalized.
 - **M6+ — remaining packages**, one workstream each: RELION → PEET → STOPGAP → Dynamo →
   ProTomo → DISCA (kept out of any `--all` default given its runtime).
 - **M7 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s

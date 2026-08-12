@@ -21,3 +21,14 @@ All notable changes to this project are documented here.
   convert) shared across every k/seed. Verified end-to-end against a real installed EMAN2:
   exact recovery on the synthetic fixture, cached reruns ~2.4x faster. `docs/install/eman2.md`
   + `envs/eman2.yml` added.
+- **PyTom adapter** — real (not preview), driving `auto_focus_classify_nofrm.py` via `mpirun`
+  inside a `pytom_env` conda env. First adapter with a real, verified missing-wedge
+  pass-through (`wedge.kind: uniform` bakes a real `SingleTiltWedge` into PyTom's particle-list
+  XML). Verified end-to-end against a real installed PyTom: exact recovery on the fixture.
+  `docs/install/pytom.md` + `envs/pytom.yml` added.
+
+### Fixed
+- Native-format mask caching (EMAN2's `standard_mask.hdf`, PyTom's `mask.em`) was keyed only
+  on file existence, not the mask's own content hash — changing masks across `stw run`
+  invocations sharing an `out_dir` would have silently reused a stale converted mask. Found
+  while validating PyTom's wedge caching and fixed in both adapters.

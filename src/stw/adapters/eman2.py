@@ -119,17 +119,25 @@ class EMAN2Adapter(Adapter):
             ),
             PlannedStep(
                 "mask_convert", conda_run_argv(_ENV, "python", str(_RESOURCES / "convert_mask.py")),
-                cached=(prep_dir / "standard_mask.hdf").exists(),
+                cached=(prep_dir / self._mask_name(job)).exists(),
             ),
             PlannedStep(
                 "classify",
                 conda_run_argv(
                     _ENV, "e2spt_pcasplit.py", "--path", "spt_noalign", "--nclass", str(job.k),
-                    "--nbasis", str(opts["nbasis"]), "--mask", "standard_mask.hdf",
+                    "--nbasis", str(opts["nbasis"]), "--mask", self._mask_name(job),
                 ),
             ),
         ]
         return steps
+
+    @staticmethod
+    def _mask_name(job: Job) -> str:
+        # Keyed on the mask's own content hash: a stale standard_mask.hdf would
+        # otherwise survive a mask change across separate `stw run` invocations
+        # sharing the same out_dir (caught during real-adapter testing on PyTom's
+        # equivalent mask.em, same underlying bug).
+        return f"standard_mask_{job.mask_spec.cache_key()}.hdf"
 
     def run(self, job: Job, progress: ProgressSink | None = None) -> PackageResult:
         sink = progress or NullSink()
@@ -218,7 +226,7 @@ class EMAN2Adapter(Adapter):
             sink.step(self.name, "postprocess", 4, len(self.steps))
 
         sink.step(self.name, "mask_convert", 5, len(self.steps))
-        mask_hdf = prep_dir / "standard_mask.hdf"
+        mask_hdf = prep_dir / self._mask_name(job)
         if not mask_hdf.exists():
             self._conda(
                 ["python", str(_RESOURCES / "convert_mask.py"), str(job.mask_path), str(mask_hdf)],
@@ -232,7 +240,7 @@ class EMAN2Adapter(Adapter):
         argv = [
             "e2spt_pcasplit.py", "--path", "spt_noalign", "--iter", "1",
             "--nclass", str(job.k), "--nbasis", str(opts["nbasis"]), "--maxres", str(opts["maxres"]),
-            "--sym", str(opts["sym"]), "--mask", "standard_mask.hdf", "--nowedgefill", "--verbose", "1",
+            "--sym", str(opts["sym"]), "--mask", self._mask_name(job), "--nowedgefill", "--verbose", "1",
         ]
         if opts.get("clean"):
             argv.append("--clean")
