@@ -19,7 +19,14 @@ file tracks the public milestone sequence.
   real native adapter for the same name lands. Each preview adapter surfaces its measured
   fidelity/limitations as a `check-env` note and a run-time warning — see the module docstrings
   in `src/stw/adapters/preview/`.
-- **M3 — EMAN2**, the first real native pilot (conda-installable, no GPU/MATLAB/license).
+- [x] **M3 — EMAN2**, the first real native pilot (conda-installable, no GPU/MATLAB/license).
+  Wraps EMAN2's own `e2spt_average.py`/`e2refine_postprocess.py`/`e2spt_pcasplit.py` (never
+  reimplements the algorithm); a cached multi-step prep (patch → ingest → consensus average →
+  postprocess → mask convert, shared across every k/seed) precedes a per-run classify step.
+  Verified end-to-end against a real installed `eman2` conda env: k=2 recovers the fixture's
+  true split exactly (ARI=1.0), k=3 gives a non-degenerate split, and a cached second run is
+  ~2.4x faster than the first. `seed` here is a run index (EMAN2's own CLI exposes no
+  `random_state`), matching the same caveat already documented for `pytom-preview`.
 - **M4 — PyTom** + a Tier A/B Docker image bundling every conda-installable package.
 - **M5 — v0.1 release**: PyPI + conda-forge, docs site, `docs/limitations.md` finalized.
 - **M6+ — remaining packages**, one workstream each: RELION → PEET → STOPGAP → Dynamo →

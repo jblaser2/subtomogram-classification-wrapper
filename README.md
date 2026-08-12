@@ -4,10 +4,10 @@ Run subtomogram classification across many cryoET packages with **one config**, 
 class averages + a cross-package comparison matrix back — without installing and learning
 each package's own CLI, file formats, and quirks one at a time.
 
-> **Status: early development (pre-v0.1).** The core library, HAC Baseline, and three
-> dependency-free `mode: preview` adapters (`dynamo-preview`/`pytom-preview`/`protomo-preview`)
-> work end to end — try `stw list`. Real native packages (EMAN2 next) are still being wired
-> up. See [`ROADMAP.md`](ROADMAP.md) for the full plan and
+> **Status: early development (pre-v0.1).** The core library, HAC Baseline, three
+> dependency-free `mode: preview` adapters (`dynamo-preview`/`pytom-preview`/`protomo-preview`),
+> and a first real native package (**EMAN2**, verified end-to-end against a real install) all
+> work — try `stw list`. See [`ROADMAP.md`](ROADMAP.md) for the full plan and
 > [`docs/limitations.md`](docs/limitations.md) for what this tool does and doesn't do yet.
 
 ## Why

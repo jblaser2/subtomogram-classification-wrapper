@@ -47,6 +47,7 @@ hac = "stw.adapters.hac:HACBaselineAdapter"
 dynamo-preview = "stw.adapters.preview.dynamo_py:DynamoPreviewAdapter"
 pytom-preview = "stw.adapters.preview.pytom_py:PyTomPreviewAdapter"
 protomo-preview = "stw.adapters.preview.protomo_py:ProtomoPreviewAdapter"
+eman2 = "stw.adapters.eman2:EMAN2Adapter"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/stw"]

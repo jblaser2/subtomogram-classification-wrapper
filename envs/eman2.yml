@@ -1,0 +1,6 @@
+name: stw-eman2
+channels:
+  - cryoem
+  - conda-forge
+dependencies:
+  - eman-dev=2.99.72=nogui*
