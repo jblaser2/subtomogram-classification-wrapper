@@ -100,8 +100,19 @@ file tracks the public milestone sequence.
   end-to-end against real IMOD + PEET 1.18.2: k=2 recovers the fixture's true split exactly
   (ARI=1.0), k=3 gives a non-degenerate split, and a cached second run is roughly 2x faster
   (the slow stacked-volume/`averageAll`/`pca` stages are skipped).
-- **M8+ — remaining packages**, one workstream each: STOPGAP → Dynamo → ProTomo → DISCA (kept
-  out of any `--all` default given its runtime).
+- **STOPGAP — parked (2026-08-14, Josh's call), not started.** Scoped and researched (see
+  commit history), but genuinely heavier than the previous four: (1) its distribution isn't a
+  simple public download the way EMAN2/PyTom/RELION/PEET are — STA's own setup notes describe
+  obtaining it via a "shared archive," and its custom `build_inputs.m` glue script hardcodes a
+  T4P-specific filename pattern, so a generic replacement would need to be written from
+  scratch, not ported; (2) while checking MATLAB's PCT license (confirmed valid) for this exact
+  environment, MATLAB itself segfaulted on exit (in an unrelated telemetry module, after
+  correctly printing the license check result) — a real reliability risk for verifying a
+  multi-step MATLAB pipeline to the same standard as the previous four. Revisit once that's
+  less of a concern, or if STOPGAP becomes more relevant to prioritize despite it.
+- **M8+ — remaining packages**, one workstream each: ProTomo → Dynamo → DISCA (kept out of any
+  `--all` default given its runtime). Dynamo is also MATLAB-based like STOPGAP — the same
+  crash-on-exit risk applies there too, worth keeping in mind when its turn comes.
 - **M9 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
   JSON Schema, the requirements/capabilities report, JSONL progress events).
 
