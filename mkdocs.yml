@@ -36,6 +36,7 @@ nav:
       - EMAN2: install/eman2.md
       - PyTom: install/pytom.md
       - RELION: install/relion.md
+      - PEET: install/peet.md
   - Docker / Podman image: docker.md
   - For maintainers:
       - Publishing a release: publishing.md

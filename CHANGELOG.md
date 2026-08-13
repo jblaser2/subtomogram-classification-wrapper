@@ -37,6 +37,14 @@ All notable changes to this project are documented here.
   run-index pseudo-seed. Verified end-to-end against a real `relion_refine` 5.0.1 build: exact
   recovery on the fixture. `docs/install/relion.md` added; reclassified to Tier C after
   confirming no trustworthy conda-forge/bioconda package exists.
+- **PEET adapter** — drives the real `averageAll` → `pca` → `clusterPca` → `usePcaMotiveLists`
+  pipeline (WMD-PCA + PEET's own native k-means, not reimplemented). Tier C: sources IMOD's and
+  PEET's own setup scripts before every native call rather than assuming any fixed PATH.
+  Replicates a real gotcha from the source STA benchmark project: one MRC per particle as
+  separate `fnVolume` "tomograms" silently breaks PEET (only the first tomogram gets iterated
+  when every tomogram has one particle) — fixed by always stacking every particle into one MRC
+  "tomogram" with a single IMOD model. Verified end-to-end against real IMOD + PEET 1.18.2:
+  exact recovery on the fixture, cached reruns ~2x faster. `docs/install/peet.md` added.
 
 ### Fixed
 - PyTom's `mpirun` call failed outright inside a container (OpenMPI's `prterun` refuses to run

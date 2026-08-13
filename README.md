@@ -6,10 +6,10 @@ each package's own CLI, file formats, and quirks one at a time.
 
 > **Status: early development (pre-v0.1).** The core library, HAC Baseline, three
 > dependency-free `mode: preview` adapters (`dynamo-preview`/`pytom-preview`/`protomo-preview`),
-> and three real native packages (**EMAN2**, **PyTom**, **RELION** — all verified end-to-end
-> against real installs) all work — try `stw list`. PyTom and RELION both have a genuinely
-> working missing-wedge pass-through. See [`ROADMAP.md`](ROADMAP.md) for the full plan and
-> [`docs/limitations.md`](docs/limitations.md) for what this tool does and doesn't do yet.
+> and four real native packages (**EMAN2**, **PyTom**, **RELION**, **PEET** — all verified
+> end-to-end against real installs) all work — try `stw list`. PyTom and RELION both have a
+> genuinely working missing-wedge pass-through. See [`ROADMAP.md`](ROADMAP.md) for the full plan
+> and [`docs/limitations.md`](docs/limitations.md) for what this tool does and doesn't do yet.
 
 ## Why
 
@@ -62,8 +62,9 @@ Packages themselves are a separate story — see `stw check-env` and `docs/insta
 Some packages (EMAN2, PyTom) are conda-installable via `conda env create -f envs/<pkg>.yml`
 (see each package's own `docs/install/<pkg>.md` for the exact command and any gotchas);
 a prebuilt image with both already set up is available too, see [`docker/README.md`](docker/README.md).
-Others (Dynamo, STOPGAP, PEET, ProTomo) need a MATLAB license, IMOD, or a closed compiled
-binary that `stw` can only detect and guide you through, not install for you.
+Others (RELION, PEET, Dynamo, STOPGAP, ProTomo) have no conda/pip path at all — a from-source
+build, IMOD, a MATLAB license, or a closed compiled binary — that `stw` can only detect and
+guide you through, not install for you.
 
 ## Documentation
 

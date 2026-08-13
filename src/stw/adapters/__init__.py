@@ -17,6 +17,7 @@ def _load_builtins() -> None:
         return
     from stw.adapters.eman2 import EMAN2Adapter
     from stw.adapters.hac import HACBaselineAdapter
+    from stw.adapters.peet import PEETAdapter
     from stw.adapters.preview.dynamo_py import DynamoPreviewAdapter
     from stw.adapters.preview.protomo_py import ProtomoPreviewAdapter
     from stw.adapters.preview.pytom_py import PyTomPreviewAdapter
@@ -30,6 +31,7 @@ def _load_builtins() -> None:
     _BUILTIN["eman2"] = EMAN2Adapter
     _BUILTIN["pytom"] = PyTomAdapter
     _BUILTIN["relion"] = RELIONAdapter
+    _BUILTIN["peet"] = PEETAdapter
 
 
 def registry() -> dict[str, type[Adapter]]:

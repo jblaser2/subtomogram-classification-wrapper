@@ -85,9 +85,24 @@ file tracks the public milestone sequence.
   adapter now always passes paths relative to a fixed working directory. Also generalized the
   `EXECUTABLE` requirement checker to search common install-location fallbacks beyond bare
   `PATH`, since a from-source binary like `relion_refine` is rarely actually on it.
-- **M7+ — remaining packages**, one workstream each: PEET → STOPGAP → Dynamo → ProTomo → DISCA
-  (kept out of any `--all` default given its runtime).
-- **M8 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
+- [x] **M7 — PEET**, real `averageAll` → `pca` → `clusterPca` → `usePcaMotiveLists` pipeline
+  (WMD-PCA + PEET's own native k-means, not reimplemented). Tier C: no conda/pip path at all —
+  both IMOD (`point2model`) and PEET/"Particle" (the classification tools, MCR binaries, no
+  MATLAB license needed) ship as "source this script" installs; the adapter sources both before
+  every native call. Replicates a real, hard-won gotcha from the source STA benchmark project
+  (confirmed there via `strace`): one MRC file per particle as separate `fnVolume` "tomograms"
+  silently breaks PEET (`getInitialMOTL` only iterates the first tomogram when every tomogram
+  has one particle, giving a rank-1 PCA matrix and a degenerate split) — fixed by always
+  stacking every particle into one MRC "tomogram" with a single scattered-point IMOD model.
+  `clusterPca` exposes no seed control, so `seed` here is a run index, like EMAN2/PyTom. Wedge
+  weighting stays off (`flgWedgeWeight = 0`, matching the validated default) — PEET's `.prm`
+  format does support real wedge weighting, this adapter just doesn't enable it. Verified
+  end-to-end against real IMOD + PEET 1.18.2: k=2 recovers the fixture's true split exactly
+  (ARI=1.0), k=3 gives a non-degenerate split, and a cached second run is roughly 2x faster
+  (the slow stacked-volume/`averageAll`/`pca` stages are skipped).
+- **M8+ — remaining packages**, one workstream each: STOPGAP → Dynamo → ProTomo → DISCA (kept
+  out of any `--all` default given its runtime).
+- **M9 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
   JSON Schema, the requirements/capabilities report, JSONL progress events).
 
 ## Package install tiers

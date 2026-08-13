@@ -108,10 +108,19 @@ package fresh rather than trusting a one-liner:
   anywhere (found on a machine whose username is `user@domain`, easily
   inherited by a temp/output directory). The adapter now always passes paths
   relative to a fixed working directory rather than raw absolute strings.
+- **PEET**: no conda/pip path — both IMOD and PEET/"Particle" ship as
+  "source this script" installs (see `docs/install/peet.md`). Separately, a
+  real correctness gotcha (confirmed via `strace` in the source STA
+  benchmark project): supplying one MRC file per particle as separate
+  `fnVolume` "tomograms" silently breaks PEET — it only ever iterates the
+  *first* tomogram once every tomogram has exactly one particle, giving a
+  rank-1 PCA matrix and a degenerate near-all-one-class split with no error.
+  `stw` always stacks every particle into one MRC "tomogram" with a single
+  scattered-point IMOD model instead.
 
-Expect the remaining Tier B/C/D packages (DISCA, PEET, ProTomo, Dynamo,
-STOPGAP — none have an adapter yet, see `ROADMAP.md`) to surface their own
-share of this kind of real-world install/runtime friction too.
+Expect the remaining Tier B/C/D packages (DISCA, ProTomo, Dynamo, STOPGAP —
+none have an adapter yet, see `ROADMAP.md`) to surface their own share of
+this kind of real-world install/runtime friction too.
 
 ## Excluded packages
 
