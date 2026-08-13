@@ -30,6 +30,13 @@ All notable changes to this project are documented here.
   preview adapters, EMAN2, and PyTom. Built and run end-to-end with Podman (rootless, no
   Docker daemon): a real 3-package run against the tiny fixture scored ARI=1.0 against ground
   truth for HAC/EMAN2/PyTom alike, with full cross-package agreement. See `docker/README.md`.
+- **RELION adapter** — real Class3D, driving `relion_refine` directly (no conda env needed at
+  all: prep is pure numpy/text-format work done in-process). Second adapter with a real,
+  verified missing-wedge pass-through (a real single-axis 3D CTF cube built from the actual
+  tilt range). `--random_seed` is a genuine reproducible seed here, unlike EMAN2/PyTom's
+  run-index pseudo-seed. Verified end-to-end against a real `relion_refine` 5.0.1 build: exact
+  recovery on the fixture. `docs/install/relion.md` added; reclassified to Tier C after
+  confirming no trustworthy conda-forge/bioconda package exists.
 
 ### Fixed
 - PyTom's `mpirun` call failed outright inside a container (OpenMPI's `prterun` refuses to run
@@ -55,3 +62,11 @@ All notable changes to this project are documented here.
   upstream assumes every particle already has a score — pre-aligned particle lists never set
   one. Added a small compatibility shim (gives each particle an explicit zero score first).
   Found while validating the Tier A/B Docker image against a fresh PyTom install.
+- `relion_refine`'s own `--i`/`--ref`/`--o`/`--solvent_mask` argument parsing misidentifies a
+  valid path as invalid if the path string contains an `@` anywhere (found on a machine whose
+  username is `user@domain`, easily inherited by a temp/output directory). The RELION adapter
+  now always passes paths relative to a fixed working directory instead of raw absolute
+  strings, the same pattern already used for EMAN2.
+- The `EXECUTABLE` requirement checker only checked bare `PATH` — real for a from-source binary
+  with no fixed install convention (e.g. `relion_refine`). It now also searches a declarable
+  list of common fallback directories.

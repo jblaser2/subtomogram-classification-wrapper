@@ -78,6 +78,30 @@ def test_env_var_checker(monkeypatch):
     assert CHECKERS[ReqKind.ENV_VAR](Requirement(ReqKind.ENV_VAR, "STW_TEST_VAR")).ok is True
 
 
+def test_executable_checker_falls_back_to_detail_dirs(tmp_path, monkeypatch):
+    """Covers binaries that are commonly a from-source build at a fixed
+    location rather than something an installer puts on PATH (e.g. RELION's
+    relion_refine) -- req.detail is a searched fallback, not just metadata."""
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    bin_dir = tmp_path / "relion-install" / "bin"
+    bin_dir.mkdir(parents=True)
+    binary = bin_dir / "relion_refine"
+    binary.write_text("#!/bin/sh\necho fake\n")
+    binary.chmod(0o755)
+
+    req = Requirement(ReqKind.EXECUTABLE, "relion_refine", detail=str(bin_dir))
+    result = CHECKERS[ReqKind.EXECUTABLE](req)
+    assert result.ok is True
+    assert result.found == str(binary)
+
+
+def test_executable_checker_detail_dir_missing_binary(tmp_path, monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    req = Requirement(ReqKind.EXECUTABLE, "relion_refine", detail=str(tmp_path))
+    result = CHECKERS[ReqKind.EXECUTABLE](req)
+    assert result.ok is False
+
+
 def test_gpu_checker_absent(monkeypatch):
     monkeypatch.setattr("shutil.which", lambda name: None)
     result = CHECKERS[ReqKind.GPU](Requirement(ReqKind.GPU, "nvidia", optional=True))

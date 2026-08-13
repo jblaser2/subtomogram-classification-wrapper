@@ -66,9 +66,28 @@ file tracks the public milestone sequence.
     section documenting the real EMAN2/PyTom install gotchas found while building the Docker
     image, and corrected two stale claims (DISCA has no adapter yet; there's no `stw install`
     CLI command — Tier B means "a checked-in `envs/*.yml`," not a built subcommand).
-- **M6+ — remaining packages**, one workstream each: RELION → PEET → STOPGAP → Dynamo →
-  ProTomo → DISCA (kept out of any `--all` default given its runtime).
-- **M7 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
+- [x] **M6 — RELION**, real Class3D (regularized ML-EM, not a PCA/embedding method), always
+  `--skip_align` + CPU-only (no `--gpu`/`--blush`). Reclassified from the original Tier B guess
+  to **Tier C**: no trustworthy conda-forge/bioconda package exists (only a stale, unmaintained
+  personal-channel one) — the real install is a CMake source build. Unlike EMAN2/PyTom, prep
+  needs zero package-specific library bindings — building RELION's own CTF-cube/STAR-file
+  input formats and parsing its `_data.star` output is pure numpy/text-format work done
+  in-process with `stw`'s own dependencies; the only subprocess call is `relion_refine` itself.
+  Second adapter (after PyTom) with a real, verified missing-wedge pass-through — a real
+  single-axis 3D CTF cube built from the user's actual tilt range, not a generic default.
+  `--random_seed` is a genuine reproducible seed here (unlike EMAN2/PyTom's run-index
+  pseudo-seed). Verified end-to-end against a real `relion_refine` 5.0.1 build: k=2 recovers
+  the fixture's true split exactly (ARI=1.0), k=3 gives a non-degenerate split, and two
+  different wedge configs produce two distinct correctly-shaped cached CTF cubes/STAR files.
+  Found and fixed a real bug along the way: `relion_refine`'s own `--i`/`--ref`/`--o`/
+  `--solvent_mask` argument parsing breaks if the path string contains an `@` anywhere (this
+  machine's username is `user@domain`, easily inherited by a temp/output directory) — the
+  adapter now always passes paths relative to a fixed working directory. Also generalized the
+  `EXECUTABLE` requirement checker to search common install-location fallbacks beyond bare
+  `PATH`, since a from-source binary like `relion_refine` is rarely actually on it.
+- **M7+ — remaining packages**, one workstream each: PEET → STOPGAP → Dynamo → ProTomo → DISCA
+  (kept out of any `--all` default given its runtime).
+- **M8 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
   JSON Schema, the requirements/capabilities report, JSONL progress events).
 
 ## Package install tiers
@@ -76,8 +95,8 @@ file tracks the public milestone sequence.
 | Tier | Meaning | Packages |
 |---|---|---|
 | A | Vendored, always available | HAC Baseline, preview-mode ports |
-| B | A conda env from a checked-in `envs/<pkg>.yml` sets it up (`conda env create -f envs/<pkg>.yml -n <pkg>`, per that package's own `docs/install/<pkg>.md` — no dedicated `stw install` CLI command exists yet) | EMAN2, PyTom, DISCA, RELION (CPU) |
-| C | Detected, not auto-installed (no license needed, but no conda path) | PEET, ProTomo |
+| B | A conda env from a checked-in `envs/<pkg>.yml` sets it up (`conda env create -f envs/<pkg>.yml -n <pkg>`, per that package's own `docs/install/<pkg>.md` — no dedicated `stw install` CLI command exists yet) | EMAN2, PyTom, DISCA (unconfirmed) |
+| C | Detected, not auto-installed (no license needed, but no reliable conda/pip path — a source build) | PEET, ProTomo, **RELION** (no trustworthy conda-forge/bioconda package exists; official install is a CMake source build) |
 | D | MATLAB-licensed and/or per-machine compile step | Dynamo, STOPGAP |
 
 TomoFlow and OPUS-TOMO are intentionally out of scope — both are too slow for a "quick"

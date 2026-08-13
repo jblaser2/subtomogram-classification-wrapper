@@ -107,8 +107,25 @@ class PackageReport:
 
 
 def _check_executable(req: Requirement) -> CheckResult:
+    """Checks PATH first; `req.detail`, if set, is a `os.pathsep`-joined list
+    of extra directories to search (expanded with `~`) -- for binaries that
+    are commonly a from-source build at a fixed-ish location rather than
+    something an installer ever puts on PATH (e.g. RELION's `relion_refine`,
+    frequently built straight into `~/relion-install/bin`)."""
+    import os
+    from pathlib import Path
+
     found = shutil.which(req.name)
-    return CheckResult(req, ok=bool(found), found=found, message="found on PATH" if found else "not found on PATH")
+    if found:
+        return CheckResult(req, ok=True, found=found, message="found on PATH")
+
+    if req.detail:
+        for extra_dir in req.detail.split(os.pathsep):
+            candidate = Path(extra_dir).expanduser() / req.name
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return CheckResult(req, ok=True, found=str(candidate), message=f"found at {candidate}")
+
+    return CheckResult(req, ok=False, found=None, message="not found on PATH or common install locations")
 
 
 def _check_conda_env(req: Requirement) -> CheckResult:

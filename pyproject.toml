@@ -50,6 +50,7 @@ pytom-preview = "stw.adapters.preview.pytom_py:PyTomPreviewAdapter"
 protomo-preview = "stw.adapters.preview.protomo_py:ProtomoPreviewAdapter"
 eman2 = "stw.adapters.eman2:EMAN2Adapter"
 pytom = "stw.adapters.pytom:PyTomAdapter"
+relion = "stw.adapters.relion:RELIONAdapter"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/stw"]

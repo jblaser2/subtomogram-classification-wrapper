@@ -1,5 +1,24 @@
 # Limitations — read this before trusting a comparison across packages
 
+## The test fixture is deliberately easy — ARI=1.0 means "the wiring works," not "this is solved"
+
+Every adapter's verification claims in this repo's commit history (and the
+scores you'll see if you run the tests yourself) use
+`tests/fixtures/tiny/` — 32 synthetic particles built by
+`tests/fixtures/make_fixture.py`, **not real cryoET data**. Two classes, each
+a shared "body" blob plus a large, spatially well-separated class-specific
+blob, plus modest Gaussian noise (~5:1 signal-to-noise-std ratio). That's
+about as easy a classification problem as one can construct — real cryoET
+data is far noisier, with missing-wedge artifacts and much subtler
+conformational differences layered on top.
+
+A perfect score on this fixture is a proxy for **"the plumbing is correct"**
+(the mask applied properly, the particle-to-index mapping into each
+package's native format didn't get scrambled, the native output got parsed
+back correctly) — not a claim that any of these methods achieve perfect
+accuracy on real biological data. A *wrong* answer here is a strong bug
+signal (and has caught real ones); a perfect one isn't a benchmark result.
+
 ## Alignment
 
 `stw` requires **pre-aligned (`alignment_state: fine`) input** for every package
@@ -81,10 +100,18 @@ package fresh rather than trusting a one-liner:
   fails). See `docs/install/pytom.md` for the full story, or use the
   provided Docker/Podman image (`docker/Dockerfile.tier-ab`) to skip all of
   this — it bakes in both fixes and is verified working end-to-end.
+- **RELION**: no trustworthy conda-forge/bioconda package exists — the real
+  install is a CMake source build (see `docs/install/relion.md`). Separately,
+  a real bug was found and fixed in `stw`'s own adapter, not RELION itself:
+  `relion_refine`'s own `--i`/`--ref`/`--o`/`--solvent_mask` argument parsing
+  misidentifies a valid path as invalid if the path string contains an `@`
+  anywhere (found on a machine whose username is `user@domain`, easily
+  inherited by a temp/output directory). The adapter now always passes paths
+  relative to a fixed working directory rather than raw absolute strings.
 
-Expect the remaining Tier B/C/D packages (RELION, DISCA, PEET, ProTomo,
-Dynamo, STOPGAP — none have an adapter yet, see `ROADMAP.md`) to surface
-their own share of this kind of real-world install friction too.
+Expect the remaining Tier B/C/D packages (DISCA, PEET, ProTomo, Dynamo,
+STOPGAP — none have an adapter yet, see `ROADMAP.md`) to surface their own
+share of this kind of real-world install/runtime friction too.
 
 ## Excluded packages
 
