@@ -6,8 +6,6 @@ installs, so it runs in plain CI same as the HAC-only M1 test.
 """
 import csv
 
-import pytest
-
 from stw.config import RunConfig
 from stw.orchestrator import run_config
 from stw.scoring.gt import score_against_ground_truth
@@ -124,8 +122,10 @@ def test_mode_preview_resolves_bare_package_names(tiny_fixture_dir, tmp_path):
 
 
 def test_mode_native_does_not_resolve_to_preview(tiny_fixture_dir, tmp_path):
-    """No native "dynamo" adapter is registered yet — mode=native must fail to
-    resolve it rather than silently falling back to the preview variant."""
+    """A real "dynamo" adapter is now registered alongside dynamo-preview -- mode=native
+    must resolve to it (never silently fall back to the preview variant). This CI
+    environment has no real Dynamo/MATLAB install, so the run itself reports
+    missing_requirements rather than raising or silently substituting the preview port."""
     out_dir = tmp_path / "out"
     cfg = RunConfig.model_validate(
         {
@@ -136,5 +136,6 @@ def test_mode_native_does_not_resolve_to_preview(tiny_fixture_dir, tmp_path):
             "out_dir": str(out_dir),
         }
     )
-    with pytest.raises(KeyError):
-        run_config(cfg)
+    report = run_config(cfg)
+    assert report.results[0]["package"] == "dynamo"
+    assert report.results[0]["status"] in ("missing_requirements", "ok")

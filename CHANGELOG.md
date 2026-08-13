@@ -59,6 +59,20 @@ All notable changes to this project are documented here.
   its own generic class averages). Verified end-to-end against real ProTomo/I3 3.1.0:
   exact recovery on the fixture, a cached rerun at a different k ~7x faster, two
   different masks build two distinct cached workspaces. `docs/install/protomo.md` added.
+- **Dynamo adapter** — drives the real `dpkpca` embedding (`dpkpca.new` -> `.unfold()` ->
+  `prealign` -> `ccmatrix` -> `eigentable` -> `eigenvolumes`), cached once per particle set
+  + mask; the final clustering (`sklearn.cluster.KMeans`, a genuine reproducible seed unlike
+  EMAN2/PEET's run-index pseudo-seed) runs in Python per `(k, seed)`. Tier D: hard-requires
+  MATLAB's Parallel Computing Toolbox license. Found and honestly documented a real, non-bug
+  finding: blind top-10-eigencomponent k-means lands near chance on the test fixture even
+  though the true class-separating signal is cleanly present in the embedding — the same
+  "blind PC/factor selection isn't always the discriminating axis" property already
+  established for ProTomo/STOPGAP/Dynamo in the source project; exposes
+  `package_options.dynamo.pc_cols` as the same tuning knob. Verified end-to-end against a
+  real Dynamo + MATLAB R2024a + PCT install both ways (honest near-chance blind default,
+  exact recovery with `pc_cols` tuned), k=3 non-degeneracy, ~60x faster cached rerun across
+  k, and two distinct masks building two distinct cached embeddings. `docs/install/dynamo.md`
+  added.
 
 ### Fixed
 - PyTom's `mpirun` call failed outright inside a container (OpenMPI's `prterun` refuses to run
@@ -96,3 +110,9 @@ All notable changes to this project are documented here.
   `Path.symlink_to()` on a relative target resolves relative to the symlink's *own* directory,
   not the invoking cwd, so every symlink inside `stacks/` pointed one directory level too deep.
   Fixed by resolving each particle path to absolute before creating the symlink.
+- The `MATLAB_TOOLBOX` requirement checker could report a real, valid license as missing:
+  `matlab -batch`'s occasional segfault in an unrelated telemetry module (found while
+  validating the Dynamo adapter, roughly 1 in 8 invocations, always after the license check's
+  own answer was already printed) could append crash-dump text to stdout or pre-empt the print
+  entirely, breaking an exact `stdout.strip() == "1"` match. Now reads only the first non-empty
+  stdout line and retries once before concluding the license is unavailable.

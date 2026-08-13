@@ -136,11 +136,32 @@ file tracks the public milestone sequence.
   correctly printing the license check result) — a real reliability risk for verifying a
   multi-step MATLAB pipeline to the same standard as the previous four. Revisit once that's
   less of a concern, or if STOPGAP becomes more relevant to prioritize despite it.
-- **M9+ — remaining packages**, one workstream each: Dynamo → DISCA (kept out of any
-  `--all` default given its runtime). Dynamo is fully MATLAB-based like STOPGAP (not just
-  borrowing a library like ProTomo) — the same crash-on-exit risk applies there too, worth
-  keeping in mind when its turn comes.
-- **M10 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
+- [x] **M9 — Dynamo**, real `dpkpca` (CC-matrix eigendecomposition on the top eigencomponents +
+  k-means), driven through `dpkpca.new` -> `.unfold()` -> `prealign` -> `ccmatrix` ->
+  `eigentable` -> `eigenvolumes`. Tier D: hard-requires MATLAB's Parallel Computing Toolbox
+  license, no CPU-only fallback. The embedding is deterministic/seed-independent and cached once
+  per particle set + mask, shared across every `k`/seed; only the final clustering (plain
+  `sklearn.cluster.KMeans` in Python, not MATLAB) depends on `(k, seed)` — `seed` is a genuine
+  reproducible seed here, unlike EMAN2/PEET's run-index pseudo-seed. The MATLAB crash-on-exit
+  risk flagged when STOPGAP was parked turned out to be real but low-severity: `matlab -batch`
+  segfaults in an unrelated telemetry module (`libmwddux.so`) on exit roughly 1 in 8 invocations,
+  always *after* the real computation completes and its output is flushed — this adapter checks
+  for `eigencomponents.csv` actually existing rather than trusting the subprocess's exit code,
+  the same defensive pattern PEET's `usePcaMotiveLists` already needed. The same flakiness was
+  found and fixed in `stw`'s own `MATLAB_TOOLBOX` requirement checker (a license check can crash
+  before or after printing its answer — it hit this exact adapter's own native test suite once
+  during validation), which now reads only the first stdout line and retries once. Found and
+  honestly documented a real, non-bug finding: on the test fixture, k-means on the blind top-10
+  eigencomponent default lands near chance even though the true class-separating signal is
+  cleanly present (verified directly — a single eigencomponent column alone gets ARI=1.0) — the
+  same "blind PC/factor selection isn't always the discriminating axis" property already
+  established for ProTomo/STOPGAP/Dynamo in the source project. `package_options.dynamo.pc_cols`
+  exposes the same tuning knob used there; verified end-to-end both ways (blind default reported
+  honestly as near-chance, `pc_cols` override recovers the fixture's true split exactly), plus
+  k=3 non-degeneracy, embedding-cache reuse across k (~60x faster), and two distinct masks
+  building two distinct cached embeddings.
+- **M10+ — remaining packages**: DISCA (kept out of any `--all` default given its runtime).
+- **M11 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
   JSON Schema, the requirements/capabilities report, JSONL progress events).
 
 ## Package install tiers
@@ -150,7 +171,7 @@ file tracks the public milestone sequence.
 | A | Vendored, always available | HAC Baseline, preview-mode ports |
 | B | A conda env from a checked-in `envs/<pkg>.yml` sets it up (`conda env create -f envs/<pkg>.yml -n <pkg>`, per that package's own `docs/install/<pkg>.md` — no dedicated `stw install` CLI command exists yet) | EMAN2, PyTom, DISCA (unconfirmed) |
 | C | Detected, not auto-installed (no license needed, but no reliable conda/pip path — a source build) | PEET, **ProTomo** (no license itself, but its classification step needs a MATLAB install on the machine for its bundled MKL library — see `docs/install/protomo.md`), **RELION** (no trustworthy conda-forge/bioconda package exists; official install is a CMake source build) |
-| D | MATLAB-licensed and/or per-machine compile step | Dynamo, STOPGAP |
+| D | MATLAB-licensed and/or per-machine compile step | **Dynamo** (Parallel Computing Toolbox required, no CPU-only fallback), STOPGAP |
 
 TomoFlow and OPUS-TOMO are intentionally out of scope — both are too slow for a "quick"
 comparison tool.

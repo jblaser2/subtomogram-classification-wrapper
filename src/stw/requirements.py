@@ -196,22 +196,33 @@ def _check_matlab(req: Requirement) -> CheckResult:
 
 def _check_matlab_toolbox(req: Requirement) -> CheckResult:
     """Verifies a MATLAB toolbox LICENSE, not just the matlab binary — e.g. Dynamo's
-    real hard blocker is the Parallel Computing Toolbox license, not MATLAB itself."""
+    real hard blocker is the Parallel Computing Toolbox license, not MATLAB itself.
+
+    `matlab -batch` has been observed (while building the Dynamo adapter, roughly 1 in
+    8 invocations) to segfault in an unrelated telemetry/entitlement module
+    (`libmwddux.so`) on process exit -- *after* `disp(...)` has already printed the real
+    answer. Checking the first stdout line (not requiring the whole stream to be exactly
+    "1") tolerates trailing crash-dump text; retrying once tolerates a run where the
+    crash pre-empted the print entirely."""
     import subprocess
 
     matlab = shutil.which("matlab")
     if not matlab:
         return CheckResult(req, ok=False, found=None, message="matlab not found on PATH")
-    try:
-        out = subprocess.run(
-            ["matlab", "-nodisplay", "-batch", f"disp(license('test','{req.name}'))"],
-            capture_output=True, text=True, timeout=60,
-        )
-        ok = out.stdout.strip() == "1"
-        message = "license available" if ok else f"license('test','{req.name}') returned {out.stdout.strip()!r}"
-        return CheckResult(req, ok=ok, found=req.name if ok else None, message=message)
-    except Exception as e:  # pragma: no cover - environment dependent
-        return CheckResult(req, ok=False, found=None, message=f"could not query MATLAB license: {e}")
+
+    argv = ["matlab", "-nodisplay", "-batch", f"disp(license('test','{req.name}'))"]
+    last_stdout = ""
+    for _attempt in range(2):
+        try:
+            out = subprocess.run(argv, capture_output=True, text=True, timeout=60)
+        except Exception as e:  # pragma: no cover - environment dependent
+            return CheckResult(req, ok=False, found=None, message=f"could not query MATLAB license: {e}")
+        last_stdout = out.stdout
+        first_line = next((line.strip() for line in out.stdout.splitlines() if line.strip()), "")
+        if first_line == "1":
+            return CheckResult(req, ok=True, found=req.name, message="license available")
+    message = f"license('test','{req.name}') returned {last_stdout.strip()!r}"
+    return CheckResult(req, ok=False, found=None, message=message)
 
 
 def _check_mpi(req: Requirement) -> CheckResult:

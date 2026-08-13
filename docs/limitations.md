@@ -129,8 +129,21 @@ package fresh rather than trusting a one-liner:
   when explicitly re-`source`d immediately before the call — `stw` always rewrites
   `cycle-000/param.sh` directly before every classify call. See
   `docs/install/protomo.md`.
+- **Dynamo**: Tier D — hard-requires MATLAB's Parallel Computing Toolbox license, no
+  CPU-only fallback. Two real findings from validating this adapter: (1) `matlab -batch`
+  occasionally (~1 in 8 invocations observed) segfaults in an unrelated telemetry module
+  (`libmwddux.so`) on process exit *after* the real computation completes and its output
+  is flushed — this adapter checks for `eigencomponents.csv` actually existing rather than
+  trusting the subprocess's exit code, and the same flakiness was found and fixed in `stw`'s
+  own `MATLAB_TOOLBOX` requirement checker (a license check can crash before or after
+  printing its answer). (2) On `stw`'s own easy test fixture, k-means on the blind
+  top-10-eigencomponent default lands near chance even though the true class-separating
+  signal is cleanly present in the embedding (verified directly) — not a plumbing bug, the
+  same "blind PC/factor selection isn't always the discriminating axis" property already
+  established for ProTomo/STOPGAP/Dynamo in the source project; see
+  `package_options.dynamo.pc_cols` and `docs/install/dynamo.md`.
 
-Expect the remaining Tier B/C/D packages (DISCA, Dynamo, STOPGAP — none have an
+Expect the remaining Tier B/C/D packages (DISCA, STOPGAP — neither has an
 adapter yet, see `ROADMAP.md`) to surface their own share of this kind of
 real-world install/runtime friction too.
 

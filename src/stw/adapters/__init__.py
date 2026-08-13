@@ -15,6 +15,7 @@ _BUILTIN: dict[str, type[Adapter]] = {}
 def _load_builtins() -> None:
     if _BUILTIN:
         return
+    from stw.adapters.dynamo import DynamoAdapter
     from stw.adapters.eman2 import EMAN2Adapter
     from stw.adapters.hac import HACBaselineAdapter
     from stw.adapters.peet import PEETAdapter
@@ -34,6 +35,7 @@ def _load_builtins() -> None:
     _BUILTIN["relion"] = RELIONAdapter
     _BUILTIN["peet"] = PEETAdapter
     _BUILTIN["protomo"] = ProTomoAdapter
+    _BUILTIN["dynamo"] = DynamoAdapter
 
 
 def registry() -> dict[str, type[Adapter]]:
