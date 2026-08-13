@@ -45,6 +45,20 @@ All notable changes to this project are documented here.
   when every tomogram has one particle) — fixed by always stacking every particle into one MRC
   "tomogram" with a single IMOD model. Verified end-to-end against real IMOD + PEET 1.18.2:
   exact recovery on the fixture, cached reruns ~2x faster. `docs/install/peet.md` added.
+- **ProTomo adapter** — drives the real `tomoprepare` → `subvolinitial.sh` →
+  `subvolsvd.sh` → `subvolhac.sh` pipeline (SVD/MSA + Ward-HAC). Tier C, but with a
+  genuinely unusual dependency found by direct probing: `subvolsvd.sh`'s own LAPACK
+  call crashes against this kind of system's BLAS/LAPACK and needs MATLAB's bundled
+  MKL `LD_PRELOAD`ed instead — a real MATLAB install, though MATLAB itself is never
+  launched. Found and fixed a subtle correctness bug: `subvolhac.sh` reads its
+  `CLASSES`/`CLSFACT` from a one-time `cycle-000/param.sh` snapshot, not from
+  re-`source`d `param-template.sh` — enabling a real caching win, since the expensive
+  SVD step is independent of `k` and can be cached once per mask, shared across every
+  `k`/seed. Deliberately skips ProTomo's own `subvolclassaverage.sh`/`subvolclassalign.sh`
+  (unneeded — `subvolhac.sh` alone already writes everything needed, and `stw` builds
+  its own generic class averages). Verified end-to-end against real ProTomo/I3 3.1.0:
+  exact recovery on the fixture, a cached rerun at a different k ~7x faster, two
+  different masks build two distinct cached workspaces. `docs/install/protomo.md` added.
 
 ### Fixed
 - PyTom's `mpirun` call failed outright inside a container (OpenMPI's `prterun` refuses to run
@@ -78,3 +92,7 @@ All notable changes to this project are documented here.
 - The `EXECUTABLE` requirement checker only checked bare `PATH` — real for a from-source binary
   with no fixed install convention (e.g. `relion_refine`). It now also searches a declarable
   list of common fallback directories.
+- The ProTomo adapter's particle-series symlinks broke when `particles:` was a relative path:
+  `Path.symlink_to()` on a relative target resolves relative to the symlink's *own* directory,
+  not the invoking cwd, so every symlink inside `stacks/` pointed one directory level too deep.
+  Fixed by resolving each particle path to absolute before creating the symlink.

@@ -117,10 +117,22 @@ package fresh rather than trusting a one-liner:
   rank-1 PCA matrix and a degenerate near-all-one-class split with no error.
   `stw` always stacks every particle into one MRC "tomogram" with a single
   scattered-point IMOD model instead.
+- **ProTomo**: no conda/pip path — a "source this script" install like PEET's, with
+  a genuinely unusual extra dependency found by direct probing: its classification
+  step's LAPACK call (`subvolsvd.sh`'s `SGESDD`) crashes against this kind of
+  system's own BLAS/LAPACK and only works with **MATLAB's bundled MKL library**
+  `LD_PRELOAD`ed instead — a real MATLAB install is required on the machine even
+  though MATLAB itself is never launched (no license or toolbox needed, unlike
+  Dynamo/STOPGAP). Separately, a subtle correctness gotcha in ProTomo itself: its
+  `subvolhac.sh` reads `CLASSES`/`CLSFACT` from a one-time `cycle-000/param.sh`
+  snapshot written at workspace-creation time, not from `param-template.sh` even
+  when explicitly re-`source`d immediately before the call — `stw` always rewrites
+  `cycle-000/param.sh` directly before every classify call. See
+  `docs/install/protomo.md`.
 
-Expect the remaining Tier B/C/D packages (DISCA, ProTomo, Dynamo, STOPGAP —
-none have an adapter yet, see `ROADMAP.md`) to surface their own share of
-this kind of real-world install/runtime friction too.
+Expect the remaining Tier B/C/D packages (DISCA, Dynamo, STOPGAP — none have an
+adapter yet, see `ROADMAP.md`) to surface their own share of this kind of
+real-world install/runtime friction too.
 
 ## Excluded packages
 

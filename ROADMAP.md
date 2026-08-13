@@ -100,6 +100,32 @@ file tracks the public milestone sequence.
   end-to-end against real IMOD + PEET 1.18.2: k=2 recovers the fixture's true split exactly
   (ARI=1.0), k=3 gives a non-degenerate split, and a cached second run is roughly 2x faster
   (the slow stacked-volume/`averageAll`/`pca` stages are skipped).
+- [x] **M8 — ProTomo**, real SVD/MSA (`subvolsvd.sh`) + Ward-linkage hierarchical
+  clustering (`subvolhac.sh`), driven through `tomoprepare` -> `subvolinitial.sh` ->
+  `subvolsvd.sh` -> `subvolhac.sh`. Tier C: ProTomo/I3 3.1.0 itself needs no license
+  (a "source this script" install, like PEET), but its classification step has an
+  unusual real dependency found by direct probing: `subvolsvd.sh`'s own LAPACK call
+  (`SGESDD`) crashes against this kind of system's BLAS/LAPACK and only works with
+  MATLAB's bundled MKL `LD_PRELOAD`ed instead -- a real MATLAB install is required on
+  the machine even though MATLAB itself is never launched (no toolbox/license check,
+  unlike Dynamo/STOPGAP). Found and fixed a genuine, subtle correctness bug along the
+  way: `subvolhac.sh`'s `CLASSES`/`CLSFACT` come from a one-time `cycle-000/param.sh`
+  snapshot `subvolinitial.sh` writes, not from re-`source`d `param-template.sh` --
+  confirmed by direct probing (editing the latter and re-sourcing it silently had no
+  effect on the classification result). That same finding enabled a real caching win:
+  `subvolsvd.sh` (expensive, independent of `k`) is cached once per particle set +
+  mask, shared across every `k`/seed; only `cycle-000/param.sh` + the cheap
+  `subvolhac.sh` (no MKL preload needed) are redone per job. Deliberately skips
+  ProTomo's own `subvolclassaverage.sh`/`subvolclassalign.sh` entirely -- `subvolhac.sh`
+  alone already writes everything `tomoinfo -cls` needs, and `stw` builds its own
+  generic class averages like every other adapter, sidestepping a documented ProTomo
+  quirk (a benign but confusing native error on a near-empty HAC class) for free.
+  Fully deterministic (Ward-HAC on a fixed SVD has no RNG at all) -- `seed` means
+  nothing here, unlike EMAN2/PEET's run-index pseudo-seed. Verified end-to-end against
+  a real ProTomo/I3 3.1.0 install: k=2 recovers the fixture's true split exactly
+  (ARI=1.0), k=3 gives a non-degenerate split, two different mask configs build two
+  distinct cached workspaces, and a cached rerun at a different k is ~7x faster
+  (SVD is skipped; only the HAC step reruns).
 - **STOPGAP — parked (2026-08-14, Josh's call), not started.** Scoped and researched (see
   commit history), but genuinely heavier than the previous four: (1) its distribution isn't a
   simple public download the way EMAN2/PyTom/RELION/PEET are — STA's own setup notes describe
@@ -110,10 +136,11 @@ file tracks the public milestone sequence.
   correctly printing the license check result) — a real reliability risk for verifying a
   multi-step MATLAB pipeline to the same standard as the previous four. Revisit once that's
   less of a concern, or if STOPGAP becomes more relevant to prioritize despite it.
-- **M8+ — remaining packages**, one workstream each: ProTomo → Dynamo → DISCA (kept out of any
-  `--all` default given its runtime). Dynamo is also MATLAB-based like STOPGAP — the same
-  crash-on-exit risk applies there too, worth keeping in mind when its turn comes.
-- **M9 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
+- **M9+ — remaining packages**, one workstream each: Dynamo → DISCA (kept out of any
+  `--all` default given its runtime). Dynamo is fully MATLAB-based like STOPGAP (not just
+  borrowing a library like ProTomo) — the same crash-on-exit risk applies there too, worth
+  keeping in mind when its turn comes.
+- **M10 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
   JSON Schema, the requirements/capabilities report, JSONL progress events).
 
 ## Package install tiers
@@ -122,7 +149,7 @@ file tracks the public milestone sequence.
 |---|---|---|
 | A | Vendored, always available | HAC Baseline, preview-mode ports |
 | B | A conda env from a checked-in `envs/<pkg>.yml` sets it up (`conda env create -f envs/<pkg>.yml -n <pkg>`, per that package's own `docs/install/<pkg>.md` — no dedicated `stw install` CLI command exists yet) | EMAN2, PyTom, DISCA (unconfirmed) |
-| C | Detected, not auto-installed (no license needed, but no reliable conda/pip path — a source build) | PEET, ProTomo, **RELION** (no trustworthy conda-forge/bioconda package exists; official install is a CMake source build) |
+| C | Detected, not auto-installed (no license needed, but no reliable conda/pip path — a source build) | PEET, **ProTomo** (no license itself, but its classification step needs a MATLAB install on the machine for its bundled MKL library — see `docs/install/protomo.md`), **RELION** (no trustworthy conda-forge/bioconda package exists; official install is a CMake source build) |
 | D | MATLAB-licensed and/or per-machine compile step | Dynamo, STOPGAP |
 
 TomoFlow and OPUS-TOMO are intentionally out of scope — both are too slow for a "quick"

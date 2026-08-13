@@ -6,10 +6,11 @@ each package's own CLI, file formats, and quirks one at a time.
 
 > **Status: early development (pre-v0.1).** The core library, HAC Baseline, three
 > dependency-free `mode: preview` adapters (`dynamo-preview`/`pytom-preview`/`protomo-preview`),
-> and four real native packages (**EMAN2**, **PyTom**, **RELION**, **PEET** — all verified
-> end-to-end against real installs) all work — try `stw list`. PyTom and RELION both have a
-> genuinely working missing-wedge pass-through. See [`ROADMAP.md`](ROADMAP.md) for the full plan
-> and [`docs/limitations.md`](docs/limitations.md) for what this tool does and doesn't do yet.
+> and five real native packages (**EMAN2**, **PyTom**, **RELION**, **PEET**, **ProTomo** — all
+> verified end-to-end against real installs) all work — try `stw list`. PyTom and RELION both
+> have a genuinely working missing-wedge pass-through. See [`ROADMAP.md`](ROADMAP.md) for the
+> full plan and [`docs/limitations.md`](docs/limitations.md) for what this tool does and doesn't
+> do yet.
 
 ## Why
 

@@ -52,6 +52,7 @@ eman2 = "stw.adapters.eman2:EMAN2Adapter"
 pytom = "stw.adapters.pytom:PyTomAdapter"
 relion = "stw.adapters.relion:RELIONAdapter"
 peet = "stw.adapters.peet:PEETAdapter"
+protomo = "stw.adapters.protomo:ProTomoAdapter"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/stw"]

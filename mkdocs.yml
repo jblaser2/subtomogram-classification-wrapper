@@ -37,6 +37,7 @@ nav:
       - PyTom: install/pytom.md
       - RELION: install/relion.md
       - PEET: install/peet.md
+      - ProTomo: install/protomo.md
   - Docker / Podman image: docker.md
   - For maintainers:
       - Publishing a release: publishing.md
