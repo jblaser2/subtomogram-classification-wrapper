@@ -33,7 +33,8 @@ dependencies = [
 preview = []  # the preview-mode ports use only numpy/scipy/sklearn/mrcfile, already core deps
 viz = ["matplotlib>=3.7"]
 dev = ["pytest>=8.0", "pytest-cov", "ruff", "mypy"]
-all = ["subtomogram-classification-wrapper[viz,dev]"]
+docs = ["mkdocs>=1.6", "mkdocs-material>=9.5"]
+all = ["subtomogram-classification-wrapper[viz,dev,docs]"]
 
 [project.urls]
 Homepage = "https://github.com/jblaser2/subtomogram-classification-wrapper"

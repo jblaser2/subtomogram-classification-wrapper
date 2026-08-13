@@ -16,13 +16,48 @@ def test_executable_checker_found(monkeypatch):
 
 
 def test_conda_env_checker_not_found(tmp_path, monkeypatch):
+    # Force the path-heuristic branch regardless of whether this test runner
+    # itself has a real `conda`/`mamba` on PATH.
+    monkeypatch.setattr("shutil.which", lambda name: None)
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     result = CHECKERS[ReqKind.CONDA_ENV](Requirement(ReqKind.CONDA_ENV, "nonexistent_env"))
     assert result.ok is False
 
 
-def test_conda_env_checker_found(tmp_path, monkeypatch):
+def test_conda_env_checker_found_via_path_heuristic(tmp_path, monkeypatch):
     (tmp_path / "conda-envs" / "myenv").mkdir(parents=True)
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    result = CHECKERS[ReqKind.CONDA_ENV](Requirement(ReqKind.CONDA_ENV, "myenv"))
+    assert result.ok is True
+
+
+def test_conda_env_checker_found_via_conda_env_list(monkeypatch):
+    """Covers the portability fix: an env living somewhere the hardcoded path
+    heuristic would never find (e.g. a container's /opt/conda/envs) is still
+    detected when `conda env list --json` reports it."""
+    import json
+
+    class FakeCompletedProcess:
+        stdout = json.dumps({"envs": ["/opt/conda", "/opt/conda/envs/eman2"]})
+
+    monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/conda" if name == "conda" else None)
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: FakeCompletedProcess())
+    result = CHECKERS[ReqKind.CONDA_ENV](Requirement(ReqKind.CONDA_ENV, "eman2"))
+    assert result.ok is True
+    assert result.found == "/opt/conda/envs/eman2"
+
+
+def test_conda_env_checker_conda_list_failure_falls_back(tmp_path, monkeypatch):
+    """If `conda env list --json` errors (bad install, timeout, ...), the
+    checker must fall back to the path heuristic rather than raising."""
+    (tmp_path / "conda-envs" / "myenv").mkdir(parents=True)
+    monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/conda" if name == "conda" else None)
+
+    def _raise(*a, **k):
+        raise OSError("conda not actually runnable")
+
+    monkeypatch.setattr("subprocess.run", _raise)
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     result = CHECKERS[ReqKind.CONDA_ENV](Requirement(ReqKind.CONDA_ENV, "myenv"))
     assert result.ok is True

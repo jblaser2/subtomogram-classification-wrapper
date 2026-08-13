@@ -1,0 +1,42 @@
+site_name: subtomogram-classification-wrapper
+site_description: Run subtomogram classification across many cryoET packages with one config.
+site_url: https://jblaser2.github.io/subtomogram-classification-wrapper/
+repo_url: https://github.com/jblaser2/subtomogram-classification-wrapper
+repo_name: jblaser2/subtomogram-classification-wrapper
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - tables
+  - fenced_code
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Config reference: config-reference.md
+  - Limitations: limitations.md
+  - Installing packages:
+      - EMAN2: install/eman2.md
+      - PyTom: install/pytom.md
+  - Docker / Podman image: docker.md
+  - For maintainers:
+      - Publishing a release: publishing.md
+      - Roadmap (GitHub): https://github.com/jblaser2/subtomogram-classification-wrapper/blob/main/ROADMAP.md
+      - Changelog (GitHub): https://github.com/jblaser2/subtomogram-classification-wrapper/blob/main/CHANGELOG.md

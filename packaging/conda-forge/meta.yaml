@@ -1,0 +1,74 @@
+{% set name = "subtomogram-classification-wrapper" %}
+{% set version = "0.1.0" %}  # bump to match the PyPI release being packaged
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  # Pull from the published PyPI sdist, not GitHub -- conda-forge convention.
+  # Replace both once the real release is up:
+  #   1. python -m build --sdist   (from a clean checkout at the tagged version)
+  #   2. sha256sum dist/*.tar.gz
+  # or, once actually on PyPI: `pip download --no-binary :all: --no-deps
+  # subtomogram-classification-wrapper==<version>` then sha256sum that file.
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name|replace("-", "_") }}-{{ version }}.tar.gz
+  sha256: REPLACE_ME_WITH_REAL_SDIST_SHA256  # placeholder -- nothing is published yet
+
+build:
+  noarch: python
+  number: 0
+  script: "{{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation"
+  entry_points:
+    - stw = stw.cli.main:app
+
+requirements:
+  host:
+    - python >=3.10
+    - pip
+    - hatchling
+  run:
+    - python >=3.10
+    - numpy >=1.24
+    - scipy >=1.10
+    - scikit-learn >=1.2
+    - mrcfile >=1.4
+    - pydantic >=2.5
+    - typer >=0.12
+    - rich >=13.0
+    - pyyaml >=6.0
+
+test:
+  imports:
+    - stw
+  commands:
+    - stw --help
+    - stw list
+    - stw check-env
+
+about:
+  home: https://github.com/jblaser2/subtomogram-classification-wrapper
+  license: MIT
+  license_file: LICENSE
+  summary: Run subtomogram classification across many cryoET packages with one config.
+  description: |
+    stw wraps HAC Baseline, EMAN2, PyTom, and several other cryoET
+    subtomogram-classification packages behind a single YAML config, running
+    each package's own real implementation (or a lightweight preview-mode
+    approximation) and producing class averages plus a cross-package
+    comparison report.
+  doc_url: https://github.com/jblaser2/subtomogram-classification-wrapper#readme
+  dev_url: https://github.com/jblaser2/subtomogram-classification-wrapper
+
+extra:
+  recipe-maintainers:
+    - jblaser2
+
+# NOT SUBMITTED. This is a draft only -- conda-forge submission is a PR to
+# github.com/conda-forge/staged-recipes (this file goes in
+# recipes/subtomogram-classification-wrapper/meta.yaml there) plus ongoing
+# maintainership on your end afterward. Needs a real PyPI release to exist
+# first (the `source.url`/`sha256` above are placeholders). See
+# docs/publishing.md for the PyPI step, and
+# https://conda-forge.org/docs/maintainer/adding_pkgs.html for the
+# conda-forge submission process itself when you're ready.

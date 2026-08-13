@@ -3,7 +3,9 @@ PyTom adapter — real PyTom (`auto_focus_classify_nofrm.py`, run via `mpirun`
 inside a conda env named `pytom_env`). An iterative reference-pair
 difference-map + masked-NCC classifier — not a PCA-embed-once method. Never
 reimplements the algorithm; only builds PyTom's own ParticleList XML/`.em`
-mask and parses its own output XML.
+mask and parses its own output XML. One small compatibility shim is applied
+to the vendored script (see `resources/pytom/README.md`) for a real
+cross-version break in `pytom.basic.structures.ParticleList.pickle()`.
 
 `-a` (noalign) is always passed: `stw` assumes pre-aligned input project-wide
 (see docs/limitations.md), and separately, PyTom's FRM alignment search
@@ -75,6 +77,17 @@ def latest_classified_xml(outdir: str | Path) -> Path | None:
     return xmls[-1] if xmls else None
 
 
+def _mpirun_prefix(np_ranks: str) -> list[str]:
+    """OpenMPI's `prterun`/`mpirun` refuses to run as root at all without this
+    flag -- a no-op for any non-root user, but the default (and only) way a
+    container image runs a process unless it sets up a dedicated user, so
+    this must always be included rather than only conditionally."""
+    argv = ["mpirun", "-np", np_ranks]
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        argv.append("--allow-run-as-root")
+    return argv
+
+
 def _wedge_angle(job: Job) -> float:
     """Missing-wedge half-angle PyTom's SingleTiltWedge expects (degrees from
     90, i.e. 90 - max_tilt). No wedge info supplied -> 0 (full coverage) —
@@ -93,7 +106,8 @@ class PyTomAdapter(Adapter):
     requirements = (
         Requirement(
             ReqKind.CONDA_ENV, _ENV,
-            install_hint="conda create -n pytom_env -c conda-forge pytom (+ openmpi)",
+            install_hint="see docs/install/pytom.md -- not a one-liner (PyTom needs a "
+            "gcc=12-pinned env + a legacy `setup.py install`, not a plain `pip`/`conda install`)",
             docs_page="docs/install/pytom.md", auto_installable=True, override_key="pytom.conda_env",
         ),
     )
@@ -150,7 +164,7 @@ class PyTomAdapter(Adapter):
             PlannedStep(
                 "classify",
                 conda_run_argv(
-                    _ENV, "mpirun", "-np", np_ranks, "python",
+                    _ENV, *_mpirun_prefix(np_ranks), "python",
                     str(_RESOURCES / "auto_focus_classify_nofrm.py"),
                     "-p", plist_name, "-k", str(job.k), "-f", str(opts["frequency"]),
                     "-m", mask_name, "-c", mask_name, "-b", str(opts["binning"]),
@@ -237,7 +251,7 @@ class PyTomAdapter(Adapter):
         np_ranks = str(safe_worker_count(job.mask_path, tiers=(4, 8, 16)))
         job.workdir.mkdir(parents=True, exist_ok=True)
         argv = [
-            "mpirun", "-np", np_ranks, "python", str(_RESOURCES / "auto_focus_classify_nofrm.py"),
+            *_mpirun_prefix(np_ranks), "python", str(_RESOURCES / "auto_focus_classify_nofrm.py"),
             "-p", str(plist), "-k", str(job.k), "-f", str(opts["frequency"]),
             "-m", str(mask_em), "-c", str(mask_em), "-b", str(opts["binning"]),
             "-i", str(opts["niter"]), "-a", "-o", str(job.workdir),

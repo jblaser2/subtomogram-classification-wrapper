@@ -32,7 +32,7 @@ class ReqKind(str, Enum):
 
 class InstallTier(str, Enum):
     A_VENDORED = "vendored"  # ships in the wheel, always installed
-    B_CONDA = "conda_automatable"  # `stw install <pkg>` can set it up
+    B_CONDA = "conda_automatable"  # `conda env create -f envs/<pkg>.yml` can set it up
     C_GUIDED = "detect_and_guide"  # no license needed, but no automatable path
     D_LICENSED = "licensed_or_compiled"  # MATLAB license and/or per-machine compile
 
@@ -112,11 +112,35 @@ def _check_executable(req: Requirement) -> CheckResult:
 
 
 def _check_conda_env(req: Requirement) -> CheckResult:
+    import json
+    import subprocess
     from pathlib import Path
 
-    env_path = Path.home() / "conda-envs" / req.name
-    alt = Path.home() / "miniforge3" / "envs" / req.name
-    for candidate in (env_path, alt):
+    # Ask conda directly first -- the authoritative source, and the only one
+    # that's portable across install layouts the hardcoded paths below can't
+    # anticipate (a Docker/Podman image's /opt/conda/envs, Anaconda's
+    # ~/anaconda3/envs, a cluster module system's shared prefix, etc.).
+    for exe in ("conda", "mamba"):
+        if not shutil.which(exe):
+            continue
+        try:
+            out = subprocess.run([exe, "env", "list", "--json"], capture_output=True, text=True, timeout=15)
+            for env_path in json.loads(out.stdout).get("envs", []):
+                if Path(env_path).name == req.name:
+                    return CheckResult(req, ok=True, found=env_path, message="conda env found")
+        except Exception:
+            pass  # fall through to the path heuristic below
+
+    # Fallback for machines where `conda`/`mamba` themselves aren't on PATH
+    # (e.g. only a bare `conda run` wrapper script) but envs exist on disk.
+    candidates = [
+        Path.home() / "conda-envs" / req.name,
+        Path.home() / "miniforge3" / "envs" / req.name,
+        Path.home() / "miniconda3" / "envs" / req.name,
+        Path.home() / "anaconda3" / "envs" / req.name,
+        Path("/opt/conda/envs") / req.name,
+    ]
+    for candidate in candidates:
         if candidate.is_dir():
             return CheckResult(req, ok=True, found=str(candidate), message="conda env found")
     return CheckResult(req, ok=False, found=None, message=f"conda env {req.name!r} not found")

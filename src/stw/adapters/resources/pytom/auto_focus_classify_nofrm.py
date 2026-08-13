@@ -1067,6 +1067,17 @@ if __name__ == '__main__':
         pl = ParticleList()
         pl.fromXMLFile(options.filename)
 
+        # stw compatibility shim: classify() immediately calls pl.pickle(), which
+        # (in current pytom.basic.structures) assumes every particle already has
+        # a Score and crashes with AttributeError on a None one. Particle lists
+        # built by generate_particle_list.py for pre-aligned input never set a
+        # score, so give each an explicit zero FRMScore first -- semantically a
+        # no-op (FRMScore's own default is 0), just makes pl.pickle() safe.
+        from pytom.alignment.FRMAlignment import FRMScore
+        for _p in pl:
+            if _p.getScore() is None:
+                _p.setScore(FRMScore(0))
+
         classify(pl, settings)
     except Exception as e:
         print(e)

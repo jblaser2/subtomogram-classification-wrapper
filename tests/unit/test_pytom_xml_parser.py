@@ -3,7 +3,7 @@ wedge-angle conversion — pure functions, testable without the pytom_env
 conda env or any real PyTom output."""
 from pathlib import Path
 
-from stw.adapters.pytom import _wedge_angle, latest_classified_xml, parse_classified_xml
+from stw.adapters.pytom import _mpirun_prefix, _wedge_angle, latest_classified_xml, parse_classified_xml
 from stw.spec import AlignmentState, Job, MaskSpec, ParticleSet, WedgeKind, WedgeSpec
 
 _XML = """<?xml version="1.0"?>
@@ -63,3 +63,18 @@ def test_wedge_angle_uniform_asymmetric_averages():
 def test_wedge_angle_never_negative():
     wedge = WedgeSpec(kind=WedgeKind.UNIFORM, tilt_min=-89, tilt_max=89)
     assert _wedge_angle(_job(wedge)) >= 0.0
+
+
+def test_mpirun_prefix_omits_flag_for_non_root(monkeypatch):
+    monkeypatch.setattr("os.geteuid", lambda: 1000, raising=False)
+    argv = _mpirun_prefix("4")
+    assert argv == ["mpirun", "-np", "4"]
+
+
+def test_mpirun_prefix_adds_flag_for_root(monkeypatch):
+    """A container's default user is root, and OpenMPI's mpirun/prterun
+    refuses to run at all as root without this flag -- found while
+    validating the Tier A/B Docker image."""
+    monkeypatch.setattr("os.geteuid", lambda: 0, raising=False)
+    argv = _mpirun_prefix("4")
+    assert argv == ["mpirun", "-np", "4", "--allow-run-as-root"]

@@ -66,10 +66,31 @@ Real data usually has no ground truth. `stw`'s scoring module
 and for power users validating against a known answer — it is not part of the
 normal `stw run` output.
 
+## Native package installs are genuinely fragile
+
+Both real adapters built so far needed real fixes beyond "run the documented
+install command," discovered by actually installing and running each
+package fresh rather than trusting a one-liner:
+
+- **EMAN2**: the installed `e2spt_pcasplit.py` needs one patch (a
+  `np.int` → `np.int64` fix) to run on any numpy released after ~2023.
+  `stw`'s adapter applies this automatically, idempotently, on every run.
+- **PyTom**: not on PyPI, and no `pip install` works at all — it needs the
+  *legacy* `python setup.py install`, and its C extensions only compile on
+  **gcc/g++ 12** (not whatever's current; verified conda-forge's `gcc-15.x`
+  fails). See `docs/install/pytom.md` for the full story, or use the
+  provided Docker/Podman image (`docker/Dockerfile.tier-ab`) to skip all of
+  this — it bakes in both fixes and is verified working end-to-end.
+
+Expect the remaining Tier B/C/D packages (RELION, DISCA, PEET, ProTomo,
+Dynamo, STOPGAP — none have an adapter yet, see `ROADMAP.md`) to surface
+their own share of this kind of real-world install friction too.
+
 ## Excluded packages
 
 TomoFlow and OPUS-TOMO are intentionally out of scope: both are far too slow
-for a tool meant to give a quick, first-look comparison. DISCA is included
-but is not part of any future `--all`/default package set given its runtime
-(hours per seed on a single GPU workstation, versus seconds-to-minutes for
-every other package here).
+for a tool meant to give a quick, first-look comparison. DISCA will likely
+need the same treatment once it has an adapter (not yet built) given its
+runtime (hours per seed on a single GPU workstation, versus seconds-to-minutes
+for every package wired up so far) — it should probably never be part of any
+future `--all`/default package set.

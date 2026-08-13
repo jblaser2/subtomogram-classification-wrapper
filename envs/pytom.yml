@@ -17,11 +17,30 @@ dependencies:
   - openmpi-mpicxx
   - openmpi-mpifort
   - mpi4py
-  - swig
+  - swig>=3.0.12
   - scikit-image
   - joblib
-  - gcc
+  # Pinned to gcc/g++ 12, not conda-forge's current default (15.x): PyTom's C
+  # extensions (SWIG-generated wrappers predating Python 3's C API changes,
+  # e.g. `PyString_Check`/`PyInt_Check`) only compile as warnings on pre-14
+  # GCC. GCC 14+ promotes -Wimplicit-function-declaration/-Wint-conversion to
+  # hard errors by default, which fails the build entirely. Verified: gcc=12
+  # compiles clean; gcc-15.2.0 (conda-forge's default as of this writing)
+  # does not. Revisit this pin if/when upstream patches these extensions for
+  # modern Python.
+  - gcc=12
+  - gxx=12
   - make
+  - git
   - pip
-  - pip:
-      - pytom
+# PyTom itself is not on PyPI, and no `pip install` (with or without build
+# isolation) works: its setup.py generates three launcher scripts
+# (pytom/bin/{pytom,ipytom,pytomGUI}) via a C++ compile step wired into a
+# CUSTOM `install` command that only the legacy `python setup.py install`
+# invocation runs. Install it as a separate step, always via `conda run`
+# (a bare interpreter path won't pick up this env's swig/gcc on PATH, which
+# the compile step's own subprocess calls need) -- see docs/install/pytom.md
+# and docker/Dockerfile.tier-ab for the exact validated commands:
+#   git clone --depth 1 https://github.com/SBC-Utrecht/PyTom.git
+#   cd PyTom
+#   conda run -n pytom_env python setup.py install --prefix <env prefix>

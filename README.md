@@ -56,11 +56,21 @@ $ stw run config.yaml       # runs every requested package, writes class average
 pip install -e ".[dev]"      # from a clone, while in early development
 ```
 
-Packages themselves are a separate story — see `stw check-env` and `docs/install/` once
-adapters land. Some packages (EMAN2, PyTom, DISCA) are conda-installable via
-`stw install <package>`; others (Dynamo, STOPGAP, PEET, ProTomo) need a MATLAB license,
-IMOD, or a closed compiled binary that `stw` can only detect and guide you through, not
-install for you.
+(Not yet on PyPI — see [`docs/publishing.md`](docs/publishing.md).)
+
+Packages themselves are a separate story — see `stw check-env` and `docs/install/`.
+Some packages (EMAN2, PyTom) are conda-installable via `conda env create -f envs/<pkg>.yml`
+(see each package's own `docs/install/<pkg>.md` for the exact command and any gotchas);
+a prebuilt image with both already set up is available too, see [`docker/README.md`](docker/README.md).
+Others (Dynamo, STOPGAP, PEET, ProTomo) need a MATLAB license, IMOD, or a closed compiled
+binary that `stw` can only detect and guide you through, not install for you.
+
+## Documentation
+
+Full docs (quickstart, config reference, per-package install guides, limitations) build
+with `mkdocs` from this repo's own `docs/` directory — see [`mkdocs.yml`](mkdocs.yml).
+Once GitHub Pages is enabled for this repo (Settings → Pages → Source: GitHub Actions),
+`.github/workflows/docs.yml` publishes it automatically on every push to `main`.
 
 ## Contributing an adapter for a new package
 

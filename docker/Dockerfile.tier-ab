@@ -1,0 +1,54 @@
+# Bundles every Tier A (vendored) and Tier B (conda-automatable) package into
+# one image: HAC Baseline + the three `mode: preview` ports need nothing extra
+# (they're stw's own core dependencies), and EMAN2 + PyTom each get their own
+# conda env, matching exactly how a real workstation install looks (see
+# docs/install/{eman2,pytom}.md) -- this is the real "quick and easy" path
+# for every package that doesn't need a MATLAB license or a per-machine
+# compile step (Tier C/D: PEET, ProTomo, Dynamo, STOPGAP -- can't be
+# containerized, see docs/limitations.md).
+#
+# Build (from the repo root):
+#   podman build -f docker/Dockerfile.tier-ab -t stw:tier-ab .
+# Run:
+#   podman run --rm -v "$PWD/my_particles:/data:Z" stw:tier-ab \
+#       run /data/config.yaml
+FROM docker.io/condaforge/miniforge3:24.11.3-2
+
+LABEL org.opencontainers.image.source="https://github.com/jblaser2/subtomogram-classification-wrapper"
+LABEL org.opencontainers.image.description="stw + EMAN2 + PyTom, ready to run (Tier A/B packages only)"
+
+# --- EMAN2 (Tier B) --------------------------------------------------------
+COPY envs/eman2.yml /tmp/eman2.yml
+RUN conda env create -f /tmp/eman2.yml -n eman2 \
+    && conda clean -afy \
+    && rm /tmp/eman2.yml
+
+# --- PyTom (Tier B) ---------------------------------------------------------
+# Genuinely compiles native code (OpenMPI/Boost/FFTW/SWIG bindings) -- this
+# is the slow step. See envs/pytom.yml for why gcc/gxx are pinned to 12 (PyTom's
+# C extensions only compile clean on pre-14 GCC) and docs/install/pytom.md for
+# the numpy<2 pin rationale.
+COPY envs/pytom.yml /tmp/pytom.yml
+RUN conda env create -f /tmp/pytom.yml -n pytom_env \
+    && conda clean -afy \
+    && rm /tmp/pytom.yml
+# PyTom isn't on PyPI, and no `pip install` (with or without build isolation)
+# works: its setup.py generates three launcher scripts
+# (pytom/bin/{pytom,ipytom,pytomGUI}) via a C++ compile step wired into a
+# CUSTOM `install` command that only the legacy `python setup.py install`
+# invocation runs. Must go through `conda run` (not a bare interpreter path)
+# so the compile step's own subprocess calls (swig, gcc) resolve against this
+# env's PATH -- see envs/pytom.yml and docs/install/pytom.md.
+RUN conda run -n pytom_env git clone --depth 1 https://github.com/SBC-Utrecht/PyTom.git /tmp/PyTom \
+    && cd /tmp/PyTom \
+    && conda run -n pytom_env python setup.py install --prefix /opt/conda/envs/pytom_env \
+    && cd / && rm -rf /tmp/PyTom
+
+# --- stw itself (base env) -------------------------------------------------
+COPY pyproject.toml README.md LICENSE /opt/stw/
+COPY src/ /opt/stw/src/
+RUN pip install --no-cache-dir "/opt/stw[viz]"
+
+WORKDIR /work
+ENTRYPOINT ["stw"]
+CMD ["--help"]

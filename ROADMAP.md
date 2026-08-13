@@ -38,8 +38,34 @@ file tracks the public milestone sequence.
   existence only, not keyed to the mask's own content hash, so changing masks across runs
   sharing an `out_dir` would have silently reused a stale converted mask. Still missing a
   Tier A/B Docker image bundling every conda-installable package — folded into M5.
-- **M5 — v0.1 release**: Tier A/B Docker image, PyPI + conda-forge, docs site,
-  `docs/limitations.md` finalized.
+- **M5 — v0.1 release prep: done; actual publishing is your call, not automated.**
+  - [x] **Tier A/B Docker/Podman image** (`docker/Dockerfile.tier-ab`) bundling HAC Baseline,
+    all 3 preview adapters, EMAN2, and PyTom. Built AND run end-to-end with Podman (rootless,
+    no daemon) — a real 3-package classification against the tiny fixture scored ARI=1.0 for
+    all three against ground truth, full cross-package agreement. Needed two real fixes beyond
+    the native install docs: PyTom's C extensions need gcc/g++ pinned to 12 (not conda-forge's
+    current default), and PyTom's `mpirun` call needs `--allow-run-as-root` (a container's
+    default user is root; the adapter now adds this automatically, a no-op elsewhere). See
+    `docker/README.md`.
+  - [x] **PyPI packaging prepped, not published.** Package name
+    `subtomogram-classification-wrapper` confirmed available; `python -m build` + `twine check`
+    both pass; the built wheel was installed into a clean venv and ran a real classification
+    successfully. Actual `twine upload` deliberately left to you — see `docs/publishing.md` for
+    the exact command and a GitHub Actions trusted-publishing workflow
+    (`.github/workflows/release.yml`) that's wired up but inert until you configure PyPI's
+    trusted-publisher settings for this repo.
+  - [x] **conda-forge recipe drafted, not submitted.** `packaging/conda-forge/meta.yaml` is
+    ready to file once a real PyPI release exists (submission is a PR to
+    `conda-forge/staged-recipes` plus ongoing maintainership — see
+    `packaging/conda-forge/README.md`).
+  - [x] **Docs site built, not deployed.** `mkdocs.yml` + `docs/` build cleanly
+    (`mkdocs build --strict`, verified locally) and `.github/workflows/docs.yml` will
+    auto-publish to GitHub Pages on every push to `main` once Pages is enabled for this repo
+    (Settings → Pages → Source: GitHub Actions — a one-time click only you can do).
+  - [x] `docs/limitations.md` finalized: added a "native installs are genuinely fragile"
+    section documenting the real EMAN2/PyTom install gotchas found while building the Docker
+    image, and corrected two stale claims (DISCA has no adapter yet; there's no `stw install`
+    CLI command — Tier B means "a checked-in `envs/*.yml`," not a built subcommand).
 - **M6+ — remaining packages**, one workstream each: RELION → PEET → STOPGAP → Dynamo →
   ProTomo → DISCA (kept out of any `--all` default given its runtime).
 - **M7 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
@@ -50,7 +76,7 @@ file tracks the public milestone sequence.
 | Tier | Meaning | Packages |
 |---|---|---|
 | A | Vendored, always available | HAC Baseline, preview-mode ports |
-| B | `stw install <pkg>` automates a conda env | EMAN2, PyTom, DISCA, RELION (CPU) |
+| B | A conda env from a checked-in `envs/<pkg>.yml` sets it up (`conda env create -f envs/<pkg>.yml -n <pkg>`, per that package's own `docs/install/<pkg>.md` — no dedicated `stw install` CLI command exists yet) | EMAN2, PyTom, DISCA, RELION (CPU) |
 | C | Detected, not auto-installed (no license needed, but no conda path) | PEET, ProTomo |
 | D | MATLAB-licensed and/or per-machine compile step | Dynamo, STOPGAP |
 
