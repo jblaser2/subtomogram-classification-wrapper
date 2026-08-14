@@ -9,8 +9,8 @@
 | `pattern` | str | `*.mrc` | Glob within `particles` |
 | `pixel_size` | float \| null | auto-detected | Required if MRC headers don't agree, are missing, or are left at 1.0 Å/px |
 | `k` | int \| list[int] | `2` | One or more class counts to run |
-| `mask.kind` | `none`\|`sphere`\|`cylinder`\|`file`\|`auto` | `auto` | `auto` = blind density-envelope sphere, no labels needed |
-| `mask.radius`, `mask.half_height`, `mask.axis`, `mask.center`, `mask.edge` | — | — | Required fields depend on `mask.kind` — see `MaskConfig` |
+| `mask.kind` | `none`\|`sphere`\|`cylinder`\|`file`\|`auto` | `auto` | `auto` = blind density-envelope sphere, no labels needed — see `docs/mask-design.md` |
+| `mask.radius`, `mask.half_height`, `mask.axis`, `mask.center`, `mask.edge` | — | — | Required fields depend on `mask.kind` — see `MaskConfig` and `docs/mask-design.md` |
 | `wedge.kind` | `none`\|`uniform`\|`per_particle` | `none` | See `docs/limitations.md` — most adapters ignore this today |
 | `alignment_state` | `unaligned`\|`rough`\|`fine` | `fine` | See `docs/limitations.md` — `unaligned` is a hard error for every current adapter |
 | `packages` | list[str] | required | Names from `stw list` |

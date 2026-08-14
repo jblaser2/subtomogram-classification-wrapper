@@ -5,6 +5,14 @@ pip install -e ".[dev,viz]"      # from a clone, during early development
 stw init                          # writes stw_config.yaml
 ```
 
+## What to point it at
+
+Put your subtomograms in **one directory**, all as `.mrc` files, all the **same box size**
+and **same pixel size**, and **already aligned** (rough or fine — see
+`alignment_state` below; `unaligned` particles are rejected outright, since every
+adapter wired up so far applies existing poses rather than searching for new ones).
+That directory is the `particles:` path in the config below — nothing else to prepare.
+
 Edit `stw_config.yaml`:
 
 ```yaml
@@ -12,7 +20,7 @@ particles: ./subtomos       # a directory of same-box-size, same-pixel-size .mrc
 pattern: "*.mrc"
 k: 2
 mask:
-  kind: auto                 # or sphere / cylinder / file / none — see config-reference.md
+  kind: auto                 # or sphere / cylinder / file / none — see docs/mask-design.md
 alignment_state: fine        # most packages here require pre-aligned input, see docs/limitations.md
 packages: [hac]              # which registered adapters to run — `stw list` shows all of them
 out_dir: ./stw_out
