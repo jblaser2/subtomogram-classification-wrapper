@@ -1,7 +1,7 @@
 # Tier A/B container image
 
-Bundles HAC Baseline, the three `mode: preview` ports, EMAN2, and PyTom into
-one image — every package that doesn't need a MATLAB license or a
+Bundles HAC Baseline, the three `mode: preview` ports, EMAN2, PyTom, and
+DISCA into one image — every package that doesn't need a MATLAB license or a
 per-machine compile step. This is the "quick and easy" path for that half of
 the package set: no conda wrangling, no C-toolchain pinning, just `docker
 run`/`podman run`.
@@ -14,7 +14,28 @@ docker build -f docker/Dockerfile.tier-ab -t stw:tier-ab .
 podman build -f docker/Dockerfile.tier-ab -t stw:tier-ab .
 ```
 
-Slow step is PyTom (~5-10 min, genuinely compiles C/C++ extensions).
+Slow step is PyTom (~5-10 min, genuinely compiles C/C++ extensions); DISCA
+adds a few more minutes downloading its CUDA PyTorch wheel.
+
+## Running DISCA with a GPU
+
+DISCA falls back to CPU automatically if no GPU is visible inside the
+container (verified: ARI-honest, non-degenerate, just ~19x slower — see
+below) — but for anything beyond a toy fixture you want the GPU passed
+through. That requires the NVIDIA Container Toolkit configured on the host
+(`nvidia-ctk`), which this reference machine doesn't have installed — the
+CPU-fallback path is what's actually been verified end-to-end here:
+
+```console
+# Docker, with the NVIDIA Container Toolkit installed:
+docker run --rm --gpus all -v "$PWD/my_particles:/data" stw:tier-ab run /data/config.yaml
+# Podman, with the NVIDIA CDI spec generated (nvidia-ctk cdi generate):
+podman run --rm --device nvidia.com/gpu=all -v "$PWD/my_particles:/data:Z" stw:tier-ab run /data/config.yaml
+```
+
+Without either flag, `stw check-env`'s `gpu: nvidia-smi` check for DISCA
+reports a *degraded* note (not a hard failure), matching how the adapter
+itself behaves.
 
 ## Run
 
@@ -46,6 +67,16 @@ Dockerfile/the adapter code (not something you need to redo):
   simple). `stw`'s PyTom adapter already adds this flag automatically when
   running as root (a no-op otherwise) — see `_mpirun_prefix()` in
   `src/stw/adapters/pytom.py`.
+
+**DISCA added and re-verified on 2026-08-14** (same rootless Podman setup;
+this machine has no NVIDIA Container Toolkit, so only the CPU-fallback path
+was tested here — see "Running DISCA with a GPU" above for what a GPU host
+needs): `stw check-env` correctly found the `disca` conda env installed and
+reported the missing GPU as a *degraded* note, not a failure. A real run
+against the tiny fixture on CPU completed successfully (`returncode=0`,
+non-degenerate 21/11 split) in **~20.5 minutes** — versus ~65-70s on a real
+GPU (about 19x slower) — confirming the adapter's documented CPU fallback is
+real, just as impractical as advertised beyond a toy-sized job.
 
 ## Rootless Podman on a restricted/managed machine
 

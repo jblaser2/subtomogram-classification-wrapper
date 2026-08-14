@@ -1,11 +1,16 @@
 # Bundles every Tier A (vendored) and Tier B (conda-automatable) package into
 # one image: HAC Baseline + the three `mode: preview` ports need nothing extra
-# (they're stw's own core dependencies), and EMAN2 + PyTom each get their own
-# conda env, matching exactly how a real workstation install looks (see
-# docs/install/{eman2,pytom}.md) -- this is the real "quick and easy" path
-# for every package that doesn't need a MATLAB license or a per-machine
-# compile step (Tier C/D: PEET, ProTomo, Dynamo, STOPGAP -- can't be
-# containerized, see docs/limitations.md).
+# (they're stw's own core dependencies), and EMAN2 + PyTom + DISCA each get
+# their own conda env, matching exactly how a real workstation install looks
+# (see docs/install/{eman2,pytom,disca}.md) -- this is the real "quick and
+# easy" path for every package that doesn't need a MATLAB license or a
+# per-machine compile step (Tier C/D: PEET, ProTomo, Dynamo, STOPGAP -- can't
+# be containerized, see docs/limitations.md).
+#
+# DISCA's own training is genuinely slow without a GPU passed through to the
+# container (see "Running DISCA with a GPU" in docker/README.md) -- the
+# adapter itself falls back to CPU automatically, so it still runs, just not
+# at a useful speed for anything beyond the tiny fixture.
 #
 # Build (from the repo root):
 #   podman build -f docker/Dockerfile.tier-ab -t stw:tier-ab .
@@ -15,7 +20,7 @@
 FROM docker.io/condaforge/miniforge3:24.11.3-2
 
 LABEL org.opencontainers.image.source="https://github.com/jblaser2/subtomogram-classification-wrapper"
-LABEL org.opencontainers.image.description="stw + EMAN2 + PyTom, ready to run (Tier A/B packages only)"
+LABEL org.opencontainers.image.description="stw + EMAN2 + PyTom + DISCA, ready to run (Tier A/B packages only)"
 
 # --- EMAN2 (Tier B) --------------------------------------------------------
 COPY envs/eman2.yml /tmp/eman2.yml
@@ -43,6 +48,16 @@ RUN conda run -n pytom_env git clone --depth 1 https://github.com/SBC-Utrecht/Py
     && cd /tmp/PyTom \
     && conda run -n pytom_env python setup.py install --prefix /opt/conda/envs/pytom_env \
     && cd / && rm -rf /tmp/PyTom
+
+# --- DISCA (Tier B) ---------------------------------------------------------
+# Pip-installable PyTorch, no compile step -- the pinned cu128 wheel in
+# envs/disca.yml downloads regardless of whether a GPU is ever passed
+# through to a container built from this image; torch itself detects CUDA
+# availability at runtime (see docs/install/disca.md).
+COPY envs/disca.yml /tmp/disca.yml
+RUN conda env create -f /tmp/disca.yml -n disca \
+    && conda clean -afy \
+    && rm /tmp/disca.yml
 
 # --- stw itself (base env) -------------------------------------------------
 COPY pyproject.toml README.md LICENSE /opt/stw/
