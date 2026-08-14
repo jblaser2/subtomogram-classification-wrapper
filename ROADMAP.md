@@ -160,7 +160,28 @@ file tracks the public milestone sequence.
   honestly as near-chance, `pc_cols` override recovers the fixture's true split exactly), plus
   k=3 non-degeneracy, embedding-cache reuse across k (~60x faster), and two distinct masks
   building two distinct cached embeddings.
-- **M10+ — remaining packages**: DISCA (kept out of any `--all` default given its runtime).
+- [x] **M10 — DISCA**, real YOPO CNN feature extractor + Gaussian-mixture EM (`torch_disca_run.py`,
+  vendored from the `aitom` toolkit), iterated inside a `disca` conda env. Tier B: pip-installable
+  PyTorch, no license/compile trickery — confirmed and reclassified from the original "(unconfirmed)"
+  tier-table annotation. Input packaging (mask + Fourier-crop to DISCA's own 32³ regime +
+  per-particle standardization) is pure numpy/mrcfile logic done in-process, no conda env needed
+  for that part. Always passes `DISCA_FIX_CHANNELS=1` (not an opt-in toggle): the vendored script's
+  original behavior silently treats the spatial box-size axis as the channel count unless this is
+  set, which only avoided crashing by coincidence at box=32 — required for correctness at any
+  other box size, the same "apply the real fix, don't leave a known bug as default" call already
+  made for EMAN2's `np.int` patch. Genuinely unseeded (torch/numpy/CUDA RNGs are never seeded) —
+  `seed` is a run index in name only, unlike EMAN2/PEET's deterministic-algorithm bookkeeping
+  index; only the mask-dependent input packaging is cached, every classification run is a fresh
+  independent training run. Verified end-to-end against a real `disca` conda env (torch 2.11+cu128)
+  on a single consumer GPU: k=2/k=3 both complete and produce non-degenerate splits in ~65-70s per
+  run on the test fixture (not the 2.5-4.7 **hours**/seed the source project reports at real
+  dataset scale — this is the one adapter that should never be part of a default/`--all` package
+  set). Found and honestly documented a real, non-bug finding: three independent runs on the test
+  fixture all landed at near-chance ARI (0.033, -0.031, -0.012) despite each completing correctly
+  — matches DISCA's own documented scope (large-scale de novo discovery across thousands of
+  particles, not fine classification of a handful of pre-aligned ones) and the source project's
+  own extensive results showing it frequently locks onto a contrast axis instead of the true
+  structural one even at hundreds of real particles.
 - **M11 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
   JSON Schema, the requirements/capabilities report, JSONL progress events).
 
@@ -169,7 +190,7 @@ file tracks the public milestone sequence.
 | Tier | Meaning | Packages |
 |---|---|---|
 | A | Vendored, always available | HAC Baseline, preview-mode ports |
-| B | A conda env from a checked-in `envs/<pkg>.yml` sets it up (`conda env create -f envs/<pkg>.yml -n <pkg>`, per that package's own `docs/install/<pkg>.md` — no dedicated `stw install` CLI command exists yet) | EMAN2, PyTom, DISCA (unconfirmed) |
+| B | A conda env from a checked-in `envs/<pkg>.yml` sets it up (`conda env create -f envs/<pkg>.yml -n <pkg>`, per that package's own `docs/install/<pkg>.md` — no dedicated `stw install` CLI command exists yet) | EMAN2, PyTom, **DISCA** (confirmed pip-installable PyTorch, no license/compile step; real training realistically needs a GPU though the code falls back to CPU) |
 | C | Detected, not auto-installed (no license needed, but no reliable conda/pip path — a source build) | PEET, **ProTomo** (no license itself, but its classification step needs a MATLAB install on the machine for its bundled MKL library — see `docs/install/protomo.md`), **RELION** (no trustworthy conda-forge/bioconda package exists; official install is a CMake source build) |
 | D | MATLAB-licensed and/or per-machine compile step | **Dynamo** (Parallel Computing Toolbox required, no CPU-only fallback), STOPGAP |
 

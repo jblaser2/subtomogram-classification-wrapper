@@ -39,6 +39,7 @@ nav:
       - PEET: install/peet.md
       - ProTomo: install/protomo.md
       - Dynamo: install/dynamo.md
+      - DISCA: install/disca.md
   - Docker / Podman image: docker.md
   - For maintainers:
       - Publishing a release: publishing.md

@@ -6,11 +6,12 @@ each package's own CLI, file formats, and quirks one at a time.
 
 > **Status: early development (pre-v0.1).** The core library, HAC Baseline, three
 > dependency-free `mode: preview` adapters (`dynamo-preview`/`pytom-preview`/`protomo-preview`),
-> and six real native packages (**EMAN2**, **PyTom**, **RELION**, **PEET**, **ProTomo**,
-> **Dynamo** — all verified end-to-end against real installs) all work — try `stw list`. PyTom
-> and RELION both have a genuinely working missing-wedge pass-through. See
-> [`ROADMAP.md`](ROADMAP.md) for the full plan and [`docs/limitations.md`](docs/limitations.md)
-> for what this tool does and doesn't do yet.
+> and seven real native packages (**EMAN2**, **PyTom**, **RELION**, **PEET**, **ProTomo**,
+> **Dynamo**, **DISCA** — all verified end-to-end against real installs) all work — try
+> `stw list`. PyTom and RELION both have a genuinely working missing-wedge pass-through. DISCA
+> is real but genuinely slow (hours/seed at real dataset scale) — never include it in a
+> default/`--all` package set. See [`ROADMAP.md`](ROADMAP.md) for the full plan and
+> [`docs/limitations.md`](docs/limitations.md) for what this tool does and doesn't do yet.
 
 ## Why
 
@@ -60,7 +61,7 @@ pip install -e ".[dev]"      # from a clone, while in early development
 (Not yet on PyPI — see [`docs/publishing.md`](docs/publishing.md).)
 
 Packages themselves are a separate story — see `stw check-env` and `docs/install/`.
-Some packages (EMAN2, PyTom) are conda-installable via `conda env create -f envs/<pkg>.yml`
+Some packages (EMAN2, PyTom, DISCA) are conda-installable via `conda env create -f envs/<pkg>.yml`
 (see each package's own `docs/install/<pkg>.md` for the exact command and any gotchas);
 a prebuilt image with both already set up is available too, see [`docker/README.md`](docker/README.md).
 Others (RELION, PEET, Dynamo, STOPGAP, ProTomo) have no conda/pip path at all — a from-source

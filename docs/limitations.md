@@ -142,16 +142,23 @@ package fresh rather than trusting a one-liner:
   same "blind PC/factor selection isn't always the discriminating axis" property already
   established for ProTomo/STOPGAP/Dynamo in the source project; see
   `package_options.dynamo.pc_cols` and `docs/install/dynamo.md`.
+- **DISCA**: no license or compile step (pip-installable PyTorch), but a real correctness
+  gotcha found while building this adapter: the vendored `torch_disca_run.py`'s original
+  channel-axis handling only avoids crashing by coincidence at box=32 (see
+  `docs/install/disca.md`) — `stw` always applies the fix (`DISCA_FIX_CHANNELS=1`), not as
+  an opt-in. Also genuinely unseeded (unlike every other adapter here, "seed" doesn't control
+  anything at all) and, unlike every other package wired up so far, genuinely slow at real
+  dataset scale (hours per seed) — see the Excluded packages section below.
 
-Expect the remaining Tier B/C/D packages (DISCA, STOPGAP — neither has an
-adapter yet, see `ROADMAP.md`) to surface their own share of this kind of
-real-world install/runtime friction too.
+Expect the remaining Tier D package (STOPGAP — parked, see `ROADMAP.md`) to surface its own
+share of this kind of real-world install/runtime friction too, if it's ever picked back up.
 
 ## Excluded packages
 
 TomoFlow and OPUS-TOMO are intentionally out of scope: both are far too slow
-for a tool meant to give a quick, first-look comparison. DISCA will likely
-need the same treatment once it has an adapter (not yet built) given its
-runtime (hours per seed on a single GPU workstation, versus seconds-to-minutes
-for every package wired up so far) — it should probably never be part of any
-future `--all`/default package set.
+for a tool meant to give a quick, first-look comparison. DISCA now has a real
+adapter (unlike TomoFlow/OPUS-TOMO, it's a genuine part of `stw`'s package
+set) but the same runtime concern applies directly: hours per seed at real
+dataset scale, versus seconds-to-minutes for every other package wired up so
+far. It should never be part of any `--all`/default package set — always opt
+into it explicitly.

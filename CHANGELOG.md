@@ -73,6 +73,20 @@ All notable changes to this project are documented here.
   exact recovery with `pc_cols` tuned), k=3 non-degeneracy, ~60x faster cached rerun across
   k, and two distinct masks building two distinct cached embeddings. `docs/install/dynamo.md`
   added.
+- **DISCA adapter** — drives the real YOPO CNN + Gaussian-mixture EM training/classification
+  loop (`torch_disca_run.py`, vendored from the `aitom` toolkit) inside a `disca` conda env.
+  Tier B: pip-installable PyTorch, reclassified from "(unconfirmed)" to confirmed. Input
+  packaging (mask + Fourier-crop + standardization) is pure numpy/mrcfile logic done
+  in-process. Always passes `DISCA_FIX_CHANNELS=1` (a required correctness fix at any box
+  size other than 32, not an opt-in toggle). Genuinely unseeded — `seed` is a run index in
+  name only; only the mask-dependent input packaging is cached, every classification run is
+  an independent training run. Found and honestly documented a real, non-bug finding: three
+  independent runs on the test fixture all landed at near-chance ARI despite each completing
+  correctly, matching DISCA's own documented scope (large-scale de novo discovery, not fine
+  classification of a handful of pre-aligned particles). Verified end-to-end against a real
+  `disca` conda env + GPU: k=2/k=3 both non-degenerate, ~65-70s per run on the test fixture
+  (versus 2.5-4.7 hours/seed at real dataset scale — never part of a default/`--all` set).
+  `docs/install/disca.md` + `envs/disca.yml` added.
 
 ### Fixed
 - PyTom's `mpirun` call failed outright inside a container (OpenMPI's `prterun` refuses to run
