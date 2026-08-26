@@ -45,16 +45,16 @@
         <option value="none">none</option>
       </select>
     </label>
-    <div class="row" id="mask-sphere-fields">
-      <label>Radius (voxels)
+    <div class="row hidden" id="mask-sphere-or-cylinder-fields">
+      <label id="f-mask-radius-label">Radius (voxels)
         <input type="number" step="any" id="f-mask-radius">
       </label>
     </div>
     <div class="row hidden" id="mask-cylinder-fields">
-      <label>Half-height (voxels)
+      <label>Half-height (voxels, half the length along the axis)
         <input type="number" step="any" id="f-mask-half-height">
       </label>
-      <label>Axis
+      <label>Axis (the cylinder's long axis)
         <select id="f-mask-axis">
           <option value="z" selected>z</option>
           <option value="y">y</option>
@@ -65,6 +65,17 @@
     <div class="row hidden" id="mask-file-fields">
       <label>Mask MRC path
         <input type="text" id="f-mask-path">
+      </label>
+    </div>
+    <div class="row hidden" id="mask-center-fields">
+      <label>Center Z (voxels, blank = box center)
+        <input type="number" step="any" id="f-mask-center-z">
+      </label>
+      <label>Center Y (voxels, blank = box center)
+        <input type="number" step="any" id="f-mask-center-y">
+      </label>
+      <label>Center X (voxels, blank = box center)
+        <input type="number" step="any" id="f-mask-center-x">
       </label>
     </div>
     <button id="preview-mask-btn" type="button" class="secondary-btn">Preview mask</button>
@@ -91,8 +102,8 @@
       <label>k (comma-separated for a sweep)
         <input type="text" id="f-k" value="2">
       </label>
-      <label>Seeds (a count, or comma-separated list)
-        <input type="text" id="f-seeds" value="1">
+      <label>Seeds (a count, e.g. "3" runs seeds 1,2,3 — or any specific integers, e.g. "7,42,123")
+        <input type="text" id="f-seeds" value="1" placeholder="e.g. 3  or  7,42,123">
       </label>
     </div>
     <div class="row">
@@ -118,7 +129,9 @@
   </section>
 
   <section class="panel" id="progress-panel">
-    <h2>Progress</h2>
+    <h2>Progress
+      <button type="button" id="progress-toggle" class="collapse-toggle">hide</button>
+    </h2>
     <div id="progress-list" class="muted">Nothing running yet.</div>
   </section>
 

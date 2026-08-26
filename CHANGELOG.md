@@ -136,6 +136,24 @@ All notable changes to this project are documented here.
   the dataset preview uses (`POST /api/preview-mask`, `render_mask_overlay_png`).
 - Both preview panels (dataset and mask) now have a "Close" button so the sidebar can be
   cleared without reloading the page.
+- **Mask center override**: `stw gui`'s mask section now exposes optional Center Z/Y/X
+  fields (blank = box center) for `sphere`/`cylinder`, matching `RunConfig`'s existing
+  `mask.center` field, which the form previously had no way to set at all.
+- **Collapsible progress panel**: auto-collapses when a run finishes (a "show" toggle in
+  its header reopens it to check a failure message or per-job timing after the fact) and
+  always reopens at the start of a new run.
+- **Results table grouping**: a (package, k) with more than one seed now collapses into
+  one summary row ("N seeds ▸", expandable) instead of listing every seed — narrows a
+  crowded multi-seed/multi-k results table visually. No automatic "best seed" selection
+  is offered, since there's no principled way to define "best" without ground truth
+  (`RunConfig.ground_truth` exists but isn't wired into the orchestrator).
+- **Comparison figure and class-average panels are now click-to-full-size** (open the raw
+  PNG in a new tab) — `render_comparison_figure`'s own figure size already scales with
+  package/seed count, but a browser-shrunk `<img>` was making it illegible with more than
+  a few packages.
+- **"All class averages" grid**: every successful job's class-average panel now also
+  renders together in one grid below the comparison figure, not just one at a time via
+  each row's own button.
 
 ### Fixed
 - PyTom's `mpirun` call failed outright inside a container (OpenMPI's `prterun` refuses to run
@@ -206,3 +224,9 @@ All notable changes to this project are documented here.
   straight through), unlike every other adapter's 1-indexed convention — found via the
   GUI at k=3 (EMAN2/HAC showed "1, 2, 3", PyTom showed "0, 1, 2"). `parse_classified_xml`
   now `+1`s PyTom's own labels to match.
+- The mask-preview overlay's fill (`alpha=0.45`) was too opaque to see the underlying
+  grayscale slice clearly through it; reduced to `alpha=0.25`.
+- The cylinder mask's `axis`/`radius`/`half_height` fields had no explanation of what
+  they actually control — `docs/mask-design.md` and `stw gui`'s own field labels now
+  say explicitly that `axis` is the long/extrusion axis and `radius` is perpendicular
+  to it, independent of `half_height`.

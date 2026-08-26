@@ -273,6 +273,24 @@ file tracks the public milestone sequence.
   fill on the dataset-preview slice, built from the live form values, no run started)
   and close buttons on both preview panels.
 
+  **Third round (same day), from real usage feedback**: a mask-center override
+  (Center Z/Y/X, blank = box center) for sphere/cylinder — `RunConfig.mask.center`
+  already existed but the form had no way to set it; `docs/mask-design.md` and the
+  form's own labels now also spell out that cylinder's `axis` is the long/extrusion
+  axis and `radius` is perpendicular to it. Lowered the mask-overlay's fill opacity
+  (0.45 -> 0.25) so the underlying slice stays legible through it. The Progress panel
+  now auto-collapses on completion with a "show" toggle to reopen it (for checking an
+  error or per-job timing after the fact), reopening itself automatically at the start
+  of the next run. A crowded multi-seed results table now collapses each (package, k)'s
+  seeds into one expandable summary row — deliberately not an automatic "best seed"
+  pick, since there's no principled definition of "best" without ground truth
+  (`RunConfig.ground_truth` exists but was never wired into the orchestrator; scoring a
+  run against it is still CLI/script-only via `stw.scoring.gt`). The comparison figure
+  and every class-average panel are now click-to-full-size (the underlying figure
+  already scales resolution with package/seed count; a browser-shrunk `<img>` was the
+  actual problem), and an "All class averages" grid shows every successful job's panel
+  together below the comparison figure, not just one at a time.
+
 ## Package install tiers
 
 | Tier | Meaning | Packages |

@@ -201,6 +201,35 @@ def test_preview_mask_kind_none_is_rejected(client, tiny_fixture_dir):
     assert res.status_code == 422
 
 
+def test_preview_mask_center_override_actually_shifts_the_mask(client, tiny_fixture_dir):
+    """Regression test for the GUI's off-center mask question: mask.center must
+    reach the built mask, not just be silently accepted and ignored."""
+    import base64
+
+    from stw.masks.primitives import box_center, build_sphere
+
+    res_centered = client.post("/api/preview-mask", json={
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "pixel_size": 5.0,
+        "mask": {"kind": "sphere", "radius": 6.0},
+    })
+    res_offcenter = client.post("/api/preview-mask", json={
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "pixel_size": 5.0,
+        "mask": {"kind": "sphere", "radius": 6.0, "center": [4, 4, 4]},
+    })
+    assert res_centered.status_code == 200
+    assert res_offcenter.status_code == 200
+    png_centered = base64.b64decode(res_centered.json()["preview_png_base64"])
+    png_offcenter = base64.b64decode(res_offcenter.json()["preview_png_base64"])
+    assert png_centered != png_offcenter
+
+    # sanity-check the underlying primitive directly too (isolates GUI plumbing
+    # from the mask math itself)
+    box = 24
+    default = build_sphere((box, box, box), box_center((box, box, box)), 6.0, 3.0)
+    offcenter = build_sphere((box, box, box), (4, 4, 4), 6.0, 3.0)
+    assert not (default == offcenter).all()
+
+
 def test_packages_expose_algorithm_summary(client):
     res = client.get("/api/packages")
     packages = {p["name"]: p for p in res.json()}

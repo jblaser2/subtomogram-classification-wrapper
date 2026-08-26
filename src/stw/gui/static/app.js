@@ -47,9 +47,15 @@ function wireConditionalFields() {
   const maskKind = $("f-mask-kind");
   const sync = () => {
     const kind = maskKind.value;
-    $("mask-sphere-fields").classList.toggle("hidden", kind !== "sphere");
-    $("mask-cylinder-fields").classList.toggle("hidden", kind !== "cylinder");
+    const isSphere = kind === "sphere";
+    const isCylinder = kind === "cylinder";
+    $("mask-sphere-or-cylinder-fields").classList.toggle("hidden", !isSphere && !isCylinder);
+    $("mask-cylinder-fields").classList.toggle("hidden", !isCylinder);
     $("mask-file-fields").classList.toggle("hidden", kind !== "file");
+    $("mask-center-fields").classList.toggle("hidden", !isSphere && !isCylinder);
+    $("f-mask-radius-label").firstChild.textContent = isCylinder
+      ? "Radius (voxels, cross-section perpendicular to axis)"
+      : "Radius (voxels)";
   };
   maskKind.addEventListener("change", sync);
   sync();
@@ -77,9 +83,14 @@ function numOrNull(id) {
 
 function buildMaskConfig() {
   const mask = { kind: $("f-mask-kind").value, edge: 3.0 };
-  if (mask.kind === "sphere") mask.radius = numOrNull("f-mask-radius");
-  if (mask.kind === "cylinder") {
+  if (mask.kind === "sphere" || mask.kind === "cylinder") {
     mask.radius = numOrNull("f-mask-radius");
+    const cz = numOrNull("f-mask-center-z");
+    const cy = numOrNull("f-mask-center-y");
+    const cx = numOrNull("f-mask-center-x");
+    if (cz !== null && cy !== null && cx !== null) mask.center = [cz, cy, cx];
+  }
+  if (mask.kind === "cylinder") {
     mask.half_height = numOrNull("f-mask-half-height");
     mask.axis = $("f-mask-axis").value;
   }
@@ -114,9 +125,15 @@ function buildConfig() {
 
 // ---------- progress panel ----------
 
+function setProgressCollapsed(collapsed) {
+  $("progress-list").classList.toggle("hidden", collapsed);
+  $("progress-toggle").textContent = collapsed ? "show" : "hide";
+}
+
 function resetProgressPanel() {
   $("progress-list").innerHTML = "";
   for (const k of Object.keys(jobRows)) delete jobRows[k];
+  setProgressCollapsed(false); // a fresh run should always start visible
 }
 
 function ensureJobRow(pkg) {
@@ -217,6 +234,7 @@ async function startRun() {
 async function finishRun(payload) {
   currentEventSource.close();
   $("run-btn").disabled = false;
+  setProgressCollapsed(true); // auto-collapse on completion; "show" reopens it for errors/timing
 
   if (payload.status === "error") {
     $("results-body").innerHTML = `<div class="error">${payload.error}</div>`;
@@ -233,26 +251,79 @@ function statusBadge(status) {
   return `<span class="badge ${cls}">${status}</span>`;
 }
 
+function classesSummary(r) {
+  return r.n_per_class && Object.keys(r.n_per_class).length
+    ? Object.entries(r.n_per_class).map(([c, n]) => `${c}:${n}`).join(", ")
+    : "—";
+}
+
+function resultRow(r, groupId) {
+  const viewBtn = r.status === "ok" && r.class_averages && Object.keys(r.class_averages).length
+    ? `<button class="link-btn" onclick="viewPanel('${r.package}', ${r.k}, ${r.seed})">class averages</button>`
+    : "";
+  const rowAttrs = groupId ? ` class="group-detail hidden" data-group="${groupId}"` : "";
+  return `<tr${rowAttrs}>
+    <td>${groupId ? "&nbsp;&nbsp;&nbsp;&nbsp;seed " + r.seed : r.package}</td>
+    <td>${groupId ? "" : r.k}</td><td>${groupId ? "" : r.seed}</td>
+    <td>${statusBadge(r.status)}</td>
+    <td>${r.elapsed_sec ? r.elapsed_sec.toFixed(1) + "s" : "—"}</td>
+    <td>${classesSummary(r)}</td>
+    <td>${r.error ? `<span class="muted">${r.error}</span>` : viewBtn}</td>
+  </tr>`;
+}
+
+// Groups rows crowding the table (many seeds and/or many k values for one package)
+// into one collapsed summary row per (package, k) with an expand toggle -- there is
+// no principled "best seed" without ground truth (not wired into the orchestrator),
+// so this narrows the table down visually rather than picking a winner for you.
+function groupResults(results) {
+  const groups = new Map();
+  for (const r of results) {
+    const key = `${r.package}|${r.k}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  return [...groups.values()];
+}
+
 function renderResults(report) {
   const body = $("results-body");
   body.className = "";
-  const rows = report.results
-    .map((r) => {
-      const classes = r.n_per_class && Object.keys(r.n_per_class).length
-        ? Object.entries(r.n_per_class).map(([c, n]) => `${c}:${n}`).join(", ")
-        : "—";
-      const viewBtn = r.status === "ok" && r.class_averages && Object.keys(r.class_averages).length
-        ? `<button class="link-btn" onclick="viewPanel('${r.package}', ${r.k}, ${r.seed})">class averages</button>`
-        : "";
-      return `<tr>
-        <td>${r.package}</td><td>${r.k}</td><td>${r.seed}</td>
-        <td>${statusBadge(r.status)}</td>
-        <td>${r.elapsed_sec ? r.elapsed_sec.toFixed(1) + "s" : "—"}</td>
-        <td>${classes}</td>
-        <td>${r.error ? `<span class="muted">${r.error}</span>` : viewBtn}</td>
+  const groups = groupResults(report.results);
+  const rows = groups
+    .map((group, gi) => {
+      if (group.length === 1) return resultRow(group[0], null);
+      const nOk = group.filter((r) => r.status === "ok").length;
+      const times = group.map((r) => r.elapsed_sec).filter((t) => t != null);
+      const timeRange = times.length ? `${Math.min(...times).toFixed(1)}–${Math.max(...times).toFixed(1)}s` : "—";
+      const groupId = `grp-${gi}`;
+      const summaryRow = `<tr>
+        <td>${group[0].package}</td><td>${group[0].k}</td>
+        <td><button class="link-btn" onclick="toggleGroup('${groupId}')">${group.length} seeds &#9656;</button></td>
+        <td>${nOk}/${group.length} ok</td>
+        <td>${timeRange}</td>
+        <td class="muted">varies by seed</td><td></td>
       </tr>`;
+      const detailRows = group
+        .sort((a, b) => a.seed - b.seed)
+        .map((r) => resultRow(r, groupId))
+        .join("");
+      return summaryRow + detailRows;
     })
     .join("");
+
+  const successful = report.results.filter((r) => r.status === "ok" && r.class_averages && Object.keys(r.class_averages).length);
+  const allPanels = successful.length
+    ? `<h2>All class averages</h2><div class="panel-grid">${successful
+        .map((r) => `
+          <div class="panel-grid-item">
+            <div class="panel-grid-label">${r.package} k=${r.k} seed=${r.seed}</div>
+            <a href="/api/runs/${currentRunId}/panel/${r.package}/${r.k}/${r.seed}" target="_blank" rel="noopener">
+              <img class="panel-img" src="/api/runs/${currentRunId}/panel/${r.package}/${r.k}/${r.seed}">
+            </a>
+          </div>`)
+        .join("")}</div>`
+    : "";
 
   body.innerHTML = `
     <table>
@@ -260,13 +331,27 @@ function renderResults(report) {
       <tbody>${rows}</tbody>
     </table>
     <div id="panel-view"></div>
-    ${report.comparison ? `<h2>Cross-package comparison</h2><img class="panel-img" src="/api/runs/${currentRunId}/comparison.png">` : ""}
+    ${report.comparison ? `
+      <h2>Cross-package comparison <span class="muted" style="font-weight:400; text-transform:none;">(click to open full size)</span></h2>
+      <a href="/api/runs/${currentRunId}/comparison.png" target="_blank" rel="noopener">
+        <img class="panel-img" src="/api/runs/${currentRunId}/comparison.png">
+      </a>` : ""}
+    ${allPanels}
   `;
+}
+
+function toggleGroup(groupId) {
+  const rows = document.querySelectorAll(`tr[data-group="${groupId}"]`);
+  const nowHidden = !rows[0]?.classList.contains("hidden");
+  rows.forEach((row) => row.classList.toggle("hidden", nowHidden));
 }
 
 function viewPanel(pkg, k, seed) {
   const el = $("panel-view");
-  el.innerHTML = `<h2>${pkg} k=${k} seed=${seed}</h2><img class="panel-img" src="/api/runs/${currentRunId}/panel/${pkg}/${k}/${seed}">`;
+  el.innerHTML = `<h2>${pkg} k=${k} seed=${seed}</h2>
+    <a href="/api/runs/${currentRunId}/panel/${pkg}/${k}/${seed}" target="_blank" rel="noopener">
+      <img class="panel-img" src="/api/runs/${currentRunId}/panel/${pkg}/${k}/${seed}">
+    </a>`;
   el.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
@@ -331,4 +416,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("preview-btn").addEventListener("click", previewDataset);
   $("preview-mask-btn").addEventListener("click", previewMask);
   $("run-btn").addEventListener("click", startRun);
+  $("progress-toggle").addEventListener("click", () => {
+    setProgressCollapsed(!$("progress-list").classList.contains("hidden"));
+  });
 });

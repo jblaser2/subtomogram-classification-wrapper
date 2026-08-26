@@ -32,18 +32,41 @@ stw gui --host 0.0.0.0       # bind beyond localhost (LAN-reachable — see note
    `RunConfig`'s core fields (particle directory, pattern, pixel size,
    alignment state, mask kind + params, wedge kind + tilt range, `k`, seeds,
    mode, output directory). This mirrors the YAML config the CLI takes, not
-   a separate schema.
-2. **Packages** — every registered adapter, live install status (green/red
+   a separate schema. A "Center Z/Y/X" override (blank = box center) is
+   available for `sphere`/`cylinder` — see
+   [`docs/mask-design.md`](mask-design.md) for what `cylinder`'s `axis`
+   (its long axis) vs. `radius` (perpendicular to that axis) actually mean.
+2. **Preview dataset / Preview mask** — load the particle set (particle
+   count, box, pixel size, a central-slice image of the global average) or
+   overlay the current mask form values on that same slice as a
+   semi-transparent color fill, both with no run started. Each has its own
+   "Close" button to clear it back out of the sidebar.
+3. **Packages** — every registered adapter, live install status (green/red
    dot, from the same `check_installed()` the CLI's `stw check-env` runs),
-   pre-checked when installed.
-3. **Run** — submits the config, then streams live per-package progress
+   pre-checked when installed, plus a one-line algorithm summary and a
+   `k range`/`fixed k` badge for capability-limited adapters (see
+   [`docs/packages.md`](packages.md)).
+4. **Run** — submits the config, then streams live per-package progress
    (the same step/substep events `stw run`'s Rich progress bars show) over
-   Server-Sent Events.
-4. **Results** — a table of every job's status/timing/class sizes, an
-   on-demand rendered class-average panel (central Z-slice per class — MRCs
-   aren't browser-displayable, so this is generated server-side, cached to
-   disk on first request), and the cross-package comparison figure when at
-   least two packages succeeded.
+   Server-Sent Events. The Progress panel auto-collapses once the run
+   finishes (a "show" toggle in its header reopens it — useful for checking
+   a failure message or per-job timing after the fact) and always reopens
+   itself at the start of a new run.
+5. **Results** — a table of every job's status/timing/class sizes; a
+   (package, k) with more than one seed collapses into one summary row
+   ("N seeds ▸", expandable) rather than listing every seed — there's no
+   principled way to pick a "best" seed without ground truth (which isn't
+   wired into the orchestrator; see `RunConfig.ground_truth`, currently
+   unused), so this narrows the table visually rather than choosing a
+   winner for you. Below the table: an on-demand rendered class-average
+   panel per job (central Z-slice per class — MRCs aren't browser-
+   displayable, so this is generated server-side, cached to disk on first
+   request; click any panel image to open it full-size in a new tab), the
+   cross-package comparison figure when at least two packages succeeded
+   (also click-to-full-size — the underlying figure already scales with
+   package/seed count, but a browser-shrunk `<img>` doesn't), and an "All
+   class averages" grid showing every successful job's panel side by side
+   in one place.
 
 ## Design notes
 

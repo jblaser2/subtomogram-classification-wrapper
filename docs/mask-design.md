@@ -14,11 +14,18 @@ to a full run.
   the right starting point if you don't already know a good mask for your
   structure.
 - **`sphere`** — a soft-edged sphere at `mask.radius` voxels, centered on the
-  box center by default (or `mask.center`, `[z, y, x]` voxels).
+  box center by default (or `mask.center`, `[z, y, x]` voxels — `stw gui`
+  exposes this as three optional "Center Z/Y/X" fields, shown for both
+  `sphere` and `cylinder`, left blank for the box-center default).
 - **`cylinder`** — a disc of `mask.radius` extruded ±`mask.half_height` along
   `mask.axis` (`x`/`y`/`z`) — useful for elongated or membrane-embedded
   complexes where a sphere would either clip real signal or include too much
-  background.
+  background. `mask.axis` is the cylinder's **long axis** (the direction it's
+  extruded along, e.g. `z` for a particle standing "upright" in its box);
+  `mask.radius` is the disc's radius **perpendicular to that axis**, and
+  `mask.half_height` is half the cylinder's total length **along** it — the
+  two are independent, so a tall-and-narrow or short-and-wide cylinder are
+  both just different `radius`/`half_height` combinations.
 - **`file`** — your own mask MRC, `mask.path`, same box size as your
   particles. Use this once you've hand-tuned a mask (in `stw mask`, IMOD, or
   elsewhere) and want every package to share the identical file.

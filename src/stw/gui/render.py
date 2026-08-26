@@ -73,7 +73,7 @@ def render_mask_overlay_png(avg: np.ndarray, mask: np.ndarray, title: str) -> by
     fig, ax = plt.subplots(figsize=(3.6, 3.6))
     ax.imshow(avg[mid], cmap="gray")
     overlay = ma.masked_where(mask[mid] < 0.5, mask[mid])
-    ax.imshow(overlay, cmap="autumn", alpha=0.45, vmin=0, vmax=1)
+    ax.imshow(overlay, cmap="autumn", alpha=0.25, vmin=0, vmax=1)
     ax.set_title(title, fontsize=10)
     ax.axis("off")
     fig.tight_layout()

@@ -34,7 +34,13 @@ stw run stw_config.yaml
 
 Outputs land in `out_dir`:
 
-- `<package>/k<k>/seed<NN>/predictions.csv` — `particle,class_int,class_name`
+- `<package>/k<k>/seed<NN>/predictions.csv` — the actual class assignments: `particle,class_int,class_name`
 - `<package>/k<k>/seed<NN>/class_averages/*.mrc` — one averaged volume per class
+- `<package>/k<k>/seed<NN>/run.log` (+ `.timing.json`) — that job's own subprocess log and wall-clock time
+- `<package>/_cache/` — expensive intermediate artifacts shared across every `k`/seed for that
+  package (native-format conversions, prep steps, embeddings) — safe to delete to reclaim disk;
+  everything in it is recomputed on the next run that needs it
+- `_cache/mask_<hash>.mrc` (+ `.overlay.png`) — the one resolved mask every package in the run shares
 - `comparison/cross_package.png` — cross-package agreement matrix (needs >= 2 successful packages)
-- `run_report.json` / `summary.md` — everything above plus preflight results, warnings, and timing
+- `run_report.json` / `summary.md` — everything above plus preflight results, warnings, and timing,
+  in one place
