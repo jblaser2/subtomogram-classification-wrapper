@@ -28,10 +28,12 @@ def _job(wedge=WedgeSpec()):
 
 
 def test_parse_classified_xml(tmp_path):
+    """PyTom's own <Class Name="K"/> is 0-indexed; stw's convention (every
+    other adapter) is 1-indexed, so this must come back +1'd."""
     xml = tmp_path / "classified_pl_iter3.xml"
     xml.write_text(_XML)
     labels = parse_classified_xml(xml)
-    assert labels == {"particle_001.mrc": 0, "particle_002.mrc": 1}
+    assert labels == {"particle_001.mrc": 1, "particle_002.mrc": 2}
 
 
 def test_latest_classified_xml_picks_highest_iter(tmp_path):

@@ -108,11 +108,7 @@ class DynamoAdapter(Adapter):
     name = "dynamo"
     display_name = "Dynamo"
     tier = InstallTier.D_LICENSED
-    algorithm = (
-        "Dynamo's real dpkpca: CC-matrix eigendecomposition (prealign -> ccmatrix -> "
-        "eigentable -> eigenvolumes) producing per-particle eigencomponents, then "
-        "k-means (in Python, not MATLAB) on the top components."
-    )
+    algorithm = "CC-matrix kernel PCA + k-means (dpkpca)."
     requirements = (
         Requirement(
             ReqKind.PATH_EXISTS, _DEFAULT_DYNAMO_ACTIVATE,

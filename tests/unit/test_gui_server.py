@@ -165,11 +165,47 @@ def test_preview_dataset_rejects_bad_particle_dir(client):
     assert res.status_code == 422
 
 
+@pytest.mark.parametrize(
+    "mask",
+    [
+        {"kind": "sphere", "radius": 9.0},
+        {"kind": "cylinder", "radius": 8.0, "half_height": 6.0, "axis": "z"},
+        {"kind": "auto"},
+    ],
+)
+def test_preview_mask_returns_specs_and_png(client, tiny_fixture_dir, mask):
+    res = client.post("/api/preview-mask", json={
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "pixel_size": 5.0,
+        "mask": mask,
+    })
+    assert res.status_code == 200
+    d = res.json()
+    assert d["n_particles"] == 32
+    assert len(d["preview_png_base64"]) > 0
+
+
+def test_preview_mask_rejects_missing_required_params(client, tiny_fixture_dir):
+    res = client.post("/api/preview-mask", json={
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc",
+        "mask": {"kind": "sphere"},
+    })
+    assert res.status_code == 422
+    assert "radius" in res.json()["detail"]
+
+
+def test_preview_mask_kind_none_is_rejected(client, tiny_fixture_dir):
+    res = client.post("/api/preview-mask", json={
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc",
+        "mask": {"kind": "none"},
+    })
+    assert res.status_code == 422
+
+
 def test_packages_expose_algorithm_summary(client):
     res = client.get("/api/packages")
     packages = {p["name"]: p for p in res.json()}
     assert packages["stopgap"]["algorithm"]
-    assert "hierarchical" in packages["hac"]["algorithm"]
+    assert "Ward-HAC" in packages["hac"]["algorithm"]
     assert packages["pytom-preview"]["capabilities"]["k_range"] == [2, 2]
 
 

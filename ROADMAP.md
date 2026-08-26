@@ -259,6 +259,20 @@ file tracks the public milestone sequence.
   (shown in the picker, plus a `docs/packages.md` overview page) so "what does this
   package actually do" doesn't require reading source.
 
+  **Second round (same day), from real usage feedback**: (3) PyTom's class labels were
+  0-indexed (its own native `<Class Name="K"/>`, passed straight through) while every
+  other adapter is 1-indexed — visible at k=3 as EMAN2/HAC showing "1, 2, 3" next to
+  PyTom's "0, 1, 2". Fixed by `+1`ing in `parse_classified_xml`. Shortened every
+  adapter's `algorithm` summary to one line and cross-checked wording against the
+  companion [sta-classification-figures](https://jblaser2.github.io/sta-classification-figures/)
+  site (now `docs/packages.md`'s primary reference for actually understanding each
+  algorithm, not just naming it) — caught two real errors in this project's own prior
+  wording: PEET's "WMD" mis-expanded as "weighted multivariate-data" instead of
+  wedge-masked-difference, and STOPGAP missing the AWPD (amplitude-weighted
+  phase-difference) name entirely. Added a mask-preview overlay (semi-transparent color
+  fill on the dataset-preview slice, built from the live form values, no run started)
+  and close buttons on both preview panels.
+
 ## Package install tiers
 
 | Tier | Meaning | Packages |

@@ -117,11 +117,25 @@ All notable changes to this project are documented here.
   (no run started) and shows particle count, box size, pixel size, and a central-slice
   PNG of the unweighted global average, so a config can be sanity-checked before
   committing to a full run (`POST /api/preview`, `render_volume_slice_png`).
-- **Per-package algorithm summaries**: every adapter now declares a one-to-two-sentence
+- **Per-package algorithm summaries**: every adapter now declares a short, one-line
   `algorithm` ClassVar describing the real classification method it drives, surfaced in
   `stw gui`'s package picker (along with a `k range`/`fixed k` badge for capability-
   limited adapters like `pytom-preview`'s validated-only k=2) and consolidated in a new
-  `docs/packages.md` overview page (linked from the GUI and from `README.md`).
+  `docs/packages.md` overview page (linked from the GUI and from `README.md`). Wording is
+  deliberately aligned with the companion
+  [sta-classification-figures](https://jblaser2.github.io/sta-classification-figures/)
+  site's own algorithm tags (a step-by-step visual walkthrough per package, now linked
+  from `docs/packages.md` as the reference for actually understanding each algorithm) —
+  cross-checking against it caught two real wording errors in this project's own text:
+  PEET's "WMD" was mis-expanded as "weighted multivariate-data" (it's
+  wedge-masked-difference) and STOPGAP's method was missing the AWPD
+  (amplitude-weighted phase-difference) name entirely.
+- **Mask preview** in `stw gui`: a "Preview mask" button next to the mask fields builds
+  the mask from the current form values (sphere/cylinder/auto/file, no run started) and
+  overlays it as a semi-transparent color fill on the same central-slice global average
+  the dataset preview uses (`POST /api/preview-mask`, `render_mask_overlay_png`).
+- Both preview panels (dataset and mask) now have a "Close" button so the sidebar can be
+  cleared without reloading the page.
 
 ### Fixed
 - PyTom's `mpirun` call failed outright inside a container (OpenMPI's `prterun` refuses to run
@@ -188,3 +202,7 @@ All notable changes to this project are documented here.
   keys as `int` — any caller keying off both together (the GUI's class-average panel
   renderer, which needs a class's particle count to label its slice) saw a type mismatch
   and always fell back to `n=?`. Both now consistently str-keyed.
+- PyTom's class labels were 0-indexed (PyTom's own native `<Class Name="K"/>`, passed
+  straight through), unlike every other adapter's 1-indexed convention — found via the
+  GUI at k=3 (EMAN2/HAC showed "1, 2, 3", PyTom showed "0, 1, 2"). `parse_classified_xml`
+  now `+1`s PyTom's own labels to match.

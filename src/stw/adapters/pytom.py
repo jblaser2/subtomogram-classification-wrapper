@@ -57,7 +57,9 @@ _DEFAULTS = {"frequency": 20, "niter": 15, "threshold": 0.4, "binning": 1}
 def parse_classified_xml(xml_path: str | Path) -> dict[str, int]:
     """Parses a PyTom `classified_pl_iterN.xml` ParticleList into
     {basename: class_int}. PyTom writes each particle's `<Class Name="K"/>`
-    as the string form of an integer cluster id."""
+    as the string form of a 0-indexed integer cluster id -- +1'd here to
+    match every other adapter's 1-indexed convention (found via the GUI:
+    PyTom was the only package showing "0, 1, 2" instead of "1, 2, 3")."""
     tree = ET.parse(str(xml_path))
     particles = tree.findall(".//Particle")
     labels: dict[str, int] = {}
@@ -65,7 +67,7 @@ def parse_classified_xml(xml_path: str | Path) -> dict[str, int]:
         fname = os.path.basename(p.attrib.get("Filename", ""))
         class_el = p.find("Class")
         if fname and class_el is not None:
-            labels[fname] = int(class_el.attrib["Name"])
+            labels[fname] = int(class_el.attrib["Name"]) + 1
     return labels
 
 
@@ -103,12 +105,7 @@ class PyTomAdapter(Adapter):
     name = "pytom"
     display_name = "PyTom"
     tier = InstallTier.B_CONDA
-    algorithm = (
-        "auto_focus_classify_nofrm.py: iterative reference-pair difference-map "
-        "classification — starts from k random references, alternates masked-NCC "
-        "particle assignment with recomputing per-cluster averages and the mask "
-        "region that best discriminates each reference pair."
-    )
+    algorithm = "Iterative auto-focus classification (auto_focus_classify_nofrm.py)."
     requirements = (
         Requirement(
             ReqKind.CONDA_ENV, _ENV,

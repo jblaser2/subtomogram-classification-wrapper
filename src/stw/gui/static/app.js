@@ -75,7 +75,7 @@ function numOrNull(id) {
   return v === "" ? null : Number(v);
 }
 
-function buildConfig() {
+function buildMaskConfig() {
   const mask = { kind: $("f-mask-kind").value, edge: 3.0 };
   if (mask.kind === "sphere") mask.radius = numOrNull("f-mask-radius");
   if (mask.kind === "cylinder") {
@@ -84,7 +84,11 @@ function buildConfig() {
     mask.axis = $("f-mask-axis").value;
   }
   if (mask.kind === "file") mask.path = $("f-mask-path").value;
+  return mask;
+}
 
+function buildConfig() {
+  const mask = buildMaskConfig();
   const wedge = { kind: $("f-wedge-kind").value };
   if (wedge.kind === "uniform") {
     wedge.tilt_min = numOrNull("f-tilt-min");
@@ -266,41 +270,57 @@ function viewPanel(pkg, k, seed) {
   el.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-// ---------- dataset preview ----------
+// ---------- dataset / mask preview (shared) ----------
 
-async function previewDataset() {
-  const box = $("preview-result");
-  box.className = "";
+function closePreviewBox(boxId) {
+  const box = $(boxId);
+  box.className = "preview-slot";
+  box.innerHTML = "";
+}
+
+async function runPreview(endpoint, boxId, extraBody, closeLabel) {
+  const box = $(boxId);
+  box.className = "preview-slot";
   box.textContent = "Loading…";
 
   const body = {
     particles: $("f-particles").value,
     pattern: $("f-pattern").value,
     pixel_size: numOrNull("f-pixel-size"),
+    ...extraBody,
   };
   if (!body.particles) {
-    box.className = "error";
+    box.className = "preview-slot error";
     box.textContent = "particle directory is required";
     return;
   }
 
-  const res = await fetch("/api/preview", {
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({ detail: res.statusText }));
-    box.className = "error";
+    box.className = "preview-slot error";
     box.textContent = detail.detail;
     return;
   }
   const d = await res.json();
-  box.className = "preview-box";
+  box.className = "preview-slot preview-box";
   box.innerHTML = `
     <div class="preview-specs">${d.n_particles} particles &middot; box ${d.box}&sup3; &middot; ${d.pixel_size.toFixed(3)} Å/px</div>
     <img class="panel-img" src="data:image/png;base64,${d.preview_png_base64}">
+    <button type="button" class="link-btn" onclick="closePreviewBox('${boxId}')">${closeLabel}</button>
   `;
+}
+
+function previewDataset() {
+  return runPreview("/api/preview", "preview-result", {}, "Close preview");
+}
+
+function previewMask() {
+  return runPreview("/api/preview-mask", "preview-mask-result", { mask: buildMaskConfig() }, "Close mask preview");
 }
 
 // ---------- init ----------
@@ -309,5 +329,6 @@ document.addEventListener("DOMContentLoaded", () => {
   wireConditionalFields();
   loadPackages();
   $("preview-btn").addEventListener("click", previewDataset);
+  $("preview-mask-btn").addEventListener("click", previewMask);
   $("run-btn").addEventListener("click", startRun);
 });

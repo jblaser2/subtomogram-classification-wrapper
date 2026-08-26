@@ -55,3 +55,29 @@ def render_volume_slice_png(vol: np.ndarray, title: str) -> bytes:
     fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
     plt.close(fig)
     return buf.getvalue()
+
+
+def render_mask_overlay_png(avg: np.ndarray, mask: np.ndarray, title: str) -> bytes:
+    """Central Z-slice of the global average with the mask's own central
+    Z-slice overlaid as a semi-transparent color fill (masked out below 0.5
+    so only the mask's interior gets colored, not the whole frame) — in-memory
+    PNG bytes, same rationale as render_volume_slice_png (ephemeral, nothing
+    sensible to cache it under)."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy.ma as ma
+
+    mid = avg.shape[0] // 2
+    fig, ax = plt.subplots(figsize=(3.6, 3.6))
+    ax.imshow(avg[mid], cmap="gray")
+    overlay = ma.masked_where(mask[mid] < 0.5, mask[mid])
+    ax.imshow(overlay, cmap="autumn", alpha=0.45, vmin=0, vmax=1)
+    ax.set_title(title, fontsize=10)
+    ax.axis("off")
+    fig.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    return buf.getvalue()

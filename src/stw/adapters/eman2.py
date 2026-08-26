@@ -69,11 +69,7 @@ class EMAN2Adapter(Adapter):
     name = "eman2"
     display_name = "EMAN2"
     tier = InstallTier.B_CONDA
-    algorithm = (
-        "e2spt_pcasplit.py: PCA on masked per-particle differences from a consensus "
-        "average, then k-means in PCA space — real EMAN2 subtomogram-averaging "
-        "classification (e2spt_*), not reimplemented."
-    )
+    algorithm = "Fourier-space PCA + k-means (e2spt_pcasplit.py)."
     requirements = (
         Requirement(
             ReqKind.CONDA_ENV, _ENV,

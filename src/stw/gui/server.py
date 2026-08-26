@@ -25,6 +25,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from stw.adapters import registry
 from stw.averaging import global_average
 from stw.capabilities import Capabilities
@@ -85,6 +87,61 @@ def _caps_to_dict(caps: Capabilities) -> dict:
     }
 
 
+def _discover_particles(body: dict[str, Any]) -> ParticleSet:
+    from fastapi import HTTPException
+
+    particles_dir = body.get("particles", "")
+    pattern = body.get("pattern") or "*.mrc"
+    pixel_size = body.get("pixel_size")
+    try:
+        return ParticleSet.discover(particles_dir, pattern, pixel_size)
+    except ParticleSetError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+def _build_preview_mask(mask_body: dict[str, Any], particles: ParticleSet) -> np.ndarray:
+    """Builds a mask straight from the mask primitives (build_sphere/build_cylinder/
+    auto_sphere_mask/load_mrc), not resolve_mask() -- this is a throwaway preview with
+    no run/cache_dir to key a cached mask file under, and shouldn't write one."""
+    from fastapi import HTTPException
+
+    from stw.io.mrc import load_mrc
+    from stw.masks.auto import auto_sphere_mask
+    from stw.masks.primitives import box_center, build_cylinder, build_sphere
+
+    kind = mask_body.get("kind", "auto")
+    box = particles.box
+    shape = (box, box, box)
+    center = tuple(mask_body["center"]) if mask_body.get("center") else box_center(shape)
+    edge = float(mask_body.get("edge", 3.0))
+
+    if kind == "sphere":
+        if mask_body.get("radius") is None:
+            raise HTTPException(status_code=422, detail="mask kind=sphere requires radius")
+        return build_sphere(shape, center, float(mask_body["radius"]), edge)
+    if kind == "cylinder":
+        if mask_body.get("radius") is None or mask_body.get("half_height") is None:
+            raise HTTPException(status_code=422, detail="mask kind=cylinder requires radius and half_height")
+        axis = mask_body.get("axis", "z")
+        return build_cylinder(shape, center, float(mask_body["radius"]), float(mask_body["half_height"]), axis, edge)
+    if kind == "auto":
+        mask, _center, _radius = auto_sphere_mask(particles)
+        return mask
+    if kind == "file":
+        if not mask_body.get("path"):
+            raise HTTPException(status_code=422, detail="mask kind=file requires path")
+        try:
+            mask = load_mrc(mask_body["path"])
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"could not load mask file: {e}") from e
+        if mask.shape != shape:
+            raise HTTPException(
+                status_code=422, detail=f"mask file shape {mask.shape} != particle box {shape}"
+            )
+        return mask
+    raise HTTPException(status_code=422, detail="mask kind=none has no mask to preview")
+
+
 def _execute(run_id: str, cfg: RunConfig) -> None:
     state = RUNS[run_id]
     sink = QueueProgressSink(state.events)
@@ -133,16 +190,30 @@ def create_app():
 
         from stw.gui.render import render_volume_slice_png
 
-        particles_dir = body.get("particles", "")
-        pattern = body.get("pattern") or "*.mrc"
-        pixel_size = body.get("pixel_size")
-        try:
-            particles = ParticleSet.discover(particles_dir, pattern, pixel_size)
-        except ParticleSetError as e:
-            raise HTTPException(status_code=422, detail=str(e)) from e
-
+        particles = _discover_particles(body)
         avg = global_average(particles.particle_dir, list(particles.files))
         png_bytes = render_volume_slice_png(avg, title=f"global average, n={len(particles.files)}")
+        return {
+            "n_particles": len(particles.files),
+            "box": particles.box,
+            "pixel_size": particles.pixel_size,
+            "preview_png_base64": base64.b64encode(png_bytes).decode("ascii"),
+        }
+
+    @app.post("/api/preview-mask")
+    def preview_mask(body: dict[str, Any]) -> dict:
+        """Same particle-set load as /api/preview, plus builds the mask straight
+        from the current form's mask.* fields (never resolve_mask() -- there's no
+        run/cache_dir here) and overlays it as a semi-transparent color fill on the
+        same central-slice global average."""
+        import base64
+
+        from stw.gui.render import render_mask_overlay_png
+
+        particles = _discover_particles(body)
+        mask = _build_preview_mask(body.get("mask") or {}, particles)
+        avg = global_average(particles.particle_dir, list(particles.files))
+        png_bytes = render_mask_overlay_png(avg, mask, title=f"mask preview, n={len(particles.files)}")
         return {
             "n_particles": len(particles.files),
             "box": particles.box,
