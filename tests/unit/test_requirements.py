@@ -1,4 +1,4 @@
-from stw.requirements import CHECKERS, ReqKind, Requirement
+from stw.requirements import CHECKERS, ReqKind, Requirement, resolve_mpi_bin
 
 
 def test_executable_checker_not_found(monkeypatch):
@@ -100,6 +100,42 @@ def test_executable_checker_detail_dir_missing_binary(tmp_path, monkeypatch):
     req = Requirement(ReqKind.EXECUTABLE, "relion_refine", detail=str(tmp_path))
     result = CHECKERS[ReqKind.EXECUTABLE](req)
     assert result.ok is False
+
+
+def test_resolve_mpi_bin_prefers_path(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda name: f"/usr/bin/{name}" if name == "mpirun" else None)
+    assert resolve_mpi_bin() == "/usr/bin/mpirun"
+
+
+def test_resolve_mpi_bin_falls_back_to_distro_paths(tmp_path, monkeypatch):
+    """Covers the real gap found building the STOPGAP adapter: RHEL/Fedora's
+    openmpi RPM installs mpiexec without ever putting it on PATH."""
+    fake_mpiexec = tmp_path / "usr" / "lib64" / "openmpi" / "bin" / "mpiexec"
+    fake_mpiexec.parent.mkdir(parents=True)
+    fake_mpiexec.write_text("#!/bin/sh\n")
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    monkeypatch.setattr(
+        "stw.requirements._MPI_FALLBACK_PATHS",
+        (str(fake_mpiexec), "/usr/lib/x86_64-linux-gnu/openmpi/bin/mpiexec", "/usr/local/bin/mpiexec"),
+    )
+    assert resolve_mpi_bin() == str(fake_mpiexec)
+
+
+def test_resolve_mpi_bin_none_when_nothing_found(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    monkeypatch.setattr("stw.requirements._MPI_FALLBACK_PATHS", ())
+    assert resolve_mpi_bin() is None
+
+
+def test_check_mpi_ok_via_fallback_path_not_on_path(tmp_path, monkeypatch):
+    fake_mpiexec = tmp_path / "mpiexec"
+    fake_mpiexec.write_text("#!/bin/sh\n")
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    monkeypatch.setattr("stw.requirements._MPI_FALLBACK_PATHS", (str(fake_mpiexec),))
+    result = CHECKERS[ReqKind.MPI](Requirement(ReqKind.MPI, "mpirun"))
+    assert result.ok is True
+    assert result.found == str(fake_mpiexec)
+    assert "not on PATH" in result.message
 
 
 def test_gpu_checker_absent(monkeypatch):

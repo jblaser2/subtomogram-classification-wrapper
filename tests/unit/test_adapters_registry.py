@@ -7,7 +7,7 @@ def test_registry_contains_all_builtins():
     reg = registry()
     for name in (
         "hac", "dynamo-preview", "pytom-preview", "protomo-preview",
-        "eman2", "pytom", "relion", "peet", "protomo", "dynamo",
+        "eman2", "pytom", "relion", "peet", "protomo", "dynamo", "disca", "stopgap",
     ):
         assert name in reg
 

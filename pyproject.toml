@@ -55,6 +55,7 @@ peet = "stw.adapters.peet:PEETAdapter"
 protomo = "stw.adapters.protomo:ProTomoAdapter"
 dynamo = "stw.adapters.dynamo:DynamoAdapter"
 disca = "stw.adapters.disca:DISCAAdapter"
+stopgap = "stw.adapters.stopgap:STOPGAPAdapter"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/stw"]

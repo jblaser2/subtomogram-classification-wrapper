@@ -9,6 +9,7 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 
 
 class ReqKind(str, Enum):
@@ -225,9 +226,27 @@ def _check_matlab_toolbox(req: Requirement) -> CheckResult:
     return CheckResult(req, ok=False, found=None, message=message)
 
 
+# Some distro OpenMPI packages (confirmed: RHEL/Fedora's openmpi RPM) install
+# mpiexec/mpirun without ever putting them on PATH -- STOPGAP's own scripts
+# hardcode this exact path rather than assuming PATH, so the checker mirrors that.
+_MPI_FALLBACK_PATHS = (
+    "/usr/lib64/openmpi/bin/mpiexec",
+    "/usr/lib/x86_64-linux-gnu/openmpi/bin/mpiexec",
+    "/usr/local/bin/mpiexec",
+)
+
+
+def resolve_mpi_bin() -> str | None:
+    return shutil.which("mpirun") or shutil.which("mpiexec") or next(
+        (p for p in _MPI_FALLBACK_PATHS if Path(p).exists()), None
+    )
+
+
 def _check_mpi(req: Requirement) -> CheckResult:
-    found = shutil.which("mpirun") or shutil.which("mpiexec")
-    message = "found on PATH" if found else "not found on PATH"
+    found = resolve_mpi_bin()
+    message = "found on PATH" if (found and shutil.which(found.split("/")[-1])) else (
+        f"found at {found} (not on PATH)" if found else "not found on PATH or common install paths"
+    )
     return CheckResult(req, ok=bool(found), found=found, message=message)
 
 

@@ -150,8 +150,22 @@ package fresh rather than trusting a one-liner:
   anything at all) and, unlike every other package wired up so far, genuinely slow at real
   dataset scale (hours per seed) — see the Excluded packages section below.
 
-Expect the remaining Tier D package (STOPGAP — parked, see `ROADMAP.md`) to surface its own
-share of this kind of real-world install/runtime friction too, if it's ever picked back up.
+- **STOPGAP**: no public download at all — obtained via a private archive from its
+  developers (see `docs/install/stopgap.md`). Tier D, but — unlike Dynamo — no Parallel
+  Computing Toolbox license needed; its parallelism is OS-level MPI, confirmed by reading
+  every `.m` script the PCA path touches. Real, machine-specific gotcha found while
+  building this adapter: the vendored install's `exec/lib/stopgap_config*.sh` hardcode a
+  MATLAB-runtime `LD_LIBRARY_PATH` for whoever originally configured that copy — `stw`
+  always exports its own correct value first (from `package_options.stopgap.matlab_root`),
+  relying on the vendored scripts' own `export ...:$LD_LIBRARY_PATH` form to append rather
+  than replace it. Separately, `stw`'s own `MPI` requirement checker only checked `PATH`,
+  which missed this reference machine's OpenMPI entirely (RHEL's `openmpi` RPM installs
+  `mpiexec` without ever adding it to `PATH`) — `resolve_mpi_bin()` now also checks a
+  handful of common distro install paths. On `stw`'s own easy test fixture, no eigen-
+  projection column or small subset examined recovers a clean class separation the way
+  Dynamo's embedding did (best found, ARI~0.29) — checked directly (not assumed) after
+  independently confirming the embedding pipeline itself is structurally correct; see
+  `docs/install/stopgap.md`.
 
 ## Excluded packages
 

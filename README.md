@@ -6,8 +6,8 @@ each package's own CLI, file formats, and quirks one at a time.
 
 > **Status: early development (pre-v0.1).** The core library, HAC Baseline, three
 > dependency-free `mode: preview` adapters (`dynamo-preview`/`pytom-preview`/`protomo-preview`),
-> and seven real native packages (**EMAN2**, **PyTom**, **RELION**, **PEET**, **ProTomo**,
-> **Dynamo**, **DISCA** — all verified end-to-end against real installs) all work — try
+> and eight real native packages (**EMAN2**, **PyTom**, **RELION**, **PEET**, **ProTomo**,
+> **Dynamo**, **DISCA**, **STOPGAP** — all verified end-to-end against real installs) all work — try
 > `stw list`. PyTom and RELION both have a genuinely working missing-wedge pass-through. DISCA
 > is real but genuinely slow (hours/seed at real dataset scale) — never include it in a
 > default/`--all` package set. See [`ROADMAP.md`](ROADMAP.md) for the full plan and

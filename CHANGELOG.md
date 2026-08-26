@@ -87,6 +87,23 @@ All notable changes to this project are documented here.
   `disca` conda env + GPU: k=2/k=3 both non-degenerate, ~65-70s per run on the test fixture
   (versus 2.5-4.7 hours/seed at real dataset scale — never part of a default/`--all` set).
   `docs/install/disca.md` + `envs/disca.yml` added.
+- **STOPGAP adapter** — drives the real CC-matrix PCA pipeline (`rot_vol` -> `calc_ccmat` ->
+  `calc_pca_ccmat`, compiled MCR binaries dispatched via `mpiexec`) + k-means, previously
+  parked (2026-08-14) over two concerns that turned out non-blocking: `build_inputs.m`'s
+  apparent T4P-specific hardcoding only applied to that one dataset's driver (a generic
+  single-virtual-tomogram variant already existed and just needed generalizing, vendored as
+  `build_inputs_generic.m`), and the MATLAB crash-on-exit risk is handled the same defensive
+  way as Dynamo (check the output file, not the subprocess return code). Tier D, but — unlike
+  Dynamo — no Parallel Computing Toolbox license needed; parallelism is OS-level MPI. Real
+  wedge pass-through (`wedge.kind: uniform` builds an actual tilt-range wedgelist;
+  `wedge.kind: none` assumes a full +-90 degree range). `seed` is a genuine reproducible seed.
+  Found and honestly documented a real, fixture-specific finding: no PC subset examined here
+  recovers a clean class separation on the test fixture the way Dynamo's did (best found,
+  ARI~0.29), after independently confirming the embedding pipeline itself is structurally
+  correct. Verified end-to-end against a real STOPGAP + MATLAB R2024a + OpenMPI install:
+  full pipeline runs cleanly (~96s on the fixture), k=3 non-degeneracy, ~150x faster cached
+  rerun across k, two distinct masks build two distinct cached embeddings, and a supplied
+  uniform wedge reaches the wedgelist. `docs/install/stopgap.md` added.
 
 ### Fixed
 - PyTom's `mpirun` call failed outright inside a container (OpenMPI's `prterun` refuses to run
@@ -130,3 +147,11 @@ All notable changes to this project are documented here.
   own answer was already printed) could append crash-dump text to stdout or pre-empt the print
   entirely, breaking an exact `stdout.strip() == "1"` match. Now reads only the first non-empty
   stdout line and retries once before concluding the license is unavailable.
+- The `MPI` requirement checker only looked at `PATH` — real distro OpenMPI packages (found
+  while building the STOPGAP adapter: this reference machine's RHEL `openmpi` RPM) install
+  `mpiexec`/`mpirun` without ever putting them on `PATH`. `resolve_mpi_bin()` now also checks a
+  handful of common distro install paths (e.g. `/usr/lib64/openmpi/bin/mpiexec`).
+- The STOPGAP adapter's `build_inputs_generic.m` call broke when `particles:` was a relative
+  path, for the same reason already found and fixed for ProTomo: the matlab subprocess's `cwd`
+  is the embedding cache dir, not the invoking cwd, so a relative particle path resolved to the
+  wrong location. Fixed by resolving it to absolute before interpolating into the MATLAB call.

@@ -126,16 +126,6 @@ file tracks the public milestone sequence.
   (ARI=1.0), k=3 gives a non-degenerate split, two different mask configs build two
   distinct cached workspaces, and a cached rerun at a different k is ~7x faster
   (SVD is skipped; only the HAC step reruns).
-- **STOPGAP — parked (2026-08-14, Josh's call), not started.** Scoped and researched (see
-  commit history), but genuinely heavier than the previous four: (1) its distribution isn't a
-  simple public download the way EMAN2/PyTom/RELION/PEET are — STA's own setup notes describe
-  obtaining it via a "shared archive," and its custom `build_inputs.m` glue script hardcodes a
-  T4P-specific filename pattern, so a generic replacement would need to be written from
-  scratch, not ported; (2) while checking MATLAB's PCT license (confirmed valid) for this exact
-  environment, MATLAB itself segfaulted on exit (in an unrelated telemetry module, after
-  correctly printing the license check result) — a real reliability risk for verifying a
-  multi-step MATLAB pipeline to the same standard as the previous four. Revisit once that's
-  less of a concern, or if STOPGAP becomes more relevant to prioritize despite it.
 - [x] **M9 — Dynamo**, real `dpkpca` (CC-matrix eigendecomposition on the top eigencomponents +
   k-means), driven through `dpkpca.new` -> `.unfold()` -> `prealign` -> `ccmatrix` ->
   `eigentable` -> `eigenvolumes`. Tier D: hard-requires MATLAB's Parallel Computing Toolbox
@@ -182,7 +172,52 @@ file tracks the public milestone sequence.
   particles, not fine classification of a handful of pre-aligned ones) and the source project's
   own extensive results showing it frequently locks onto a contrast axis instead of the true
   structural one even at hundreds of real particles.
-- **M11 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
+- [x] **M11 — STOPGAP** (previously parked 2026-08-14, un-parked 2026-08-26), real CC-matrix
+  PCA (rigid pre-rotation `rot_vol` -> pairwise-CC `calc_ccmat` -> eigendecomposition
+  `calc_pca_ccmat`, all three compiled MCR binaries dispatched via `mpiexec`) + k-means. Tier D:
+  MATLAB needed (to run three plain sequential `.m` glue scripts and for the MCR binaries'
+  runtime libraries) but — unlike Dynamo — no Parallel Computing Toolbox license; confirmed by
+  reading every `.m` script the PCA path touches, none call `parpool`/`parfor`. Both parking
+  concerns turned out to be non-blocking: (1) the "`build_inputs.m` hardcodes a T4P-specific
+  filename pattern" concern only applied to STOPGAP's own T4P driver — the source project's
+  FM_easy/T3SS variants (single virtual tomogram, sequential `subtomo_N.mrc` naming) were
+  already fully generic, so `build_inputs_generic.m` (vendored in `resources/stopgap/`, `stw`'s
+  own file, not third-party STOPGAP source) just needed parameterizing by an arbitrary glob
+  pattern instead of writing new logic from scratch; `build_wedgelist.m`/`build_pca_aux.m`
+  needed zero changes. (2) the MATLAB crash-on-exit risk (`libmwddux.so`, confirmed to
+  reproduce here too, always *after* the real computation finishes) is handled the same way as
+  Dynamo — check the expected output file, never trust the subprocess's return code.
+  Distribution note: like the Dynamo/ProTomo parking concern predicted, STOPGAP has no
+  confirmed public download URL (a private archive from its developers) — `check_installed()`
+  only locates an existing install, same Tier-D "detect and guide" story as Dynamo.
+  A real, machine-specific gotcha found and fixed: the vendored install's
+  `exec/lib/stopgap_config*.sh` hardcode a MATLAB-runtime `LD_LIBRARY_PATH` for whoever
+  originally configured it; this adapter now always exports its own correct value first
+  (from `package_options.stopgap.matlab_root`) since the vendored scripts' own
+  `export ...:$LD_LIBRARY_PATH` form appends rather than replaces, so both coexist safely even
+  if the vendored path is wrong for the machine actually running `stw`. Also fixed a shared,
+  previously-latent gap while building this: `stw`'s own `MPI` requirement checker only checked
+  PATH, but this reference machine's OpenMPI (RHEL's `openmpi` RPM) installs `mpiexec` at
+  `/usr/lib64/openmpi/bin/mpiexec` without ever putting it on PATH — `resolve_mpi_bin()` now
+  falls back to that and a couple of other common distro install paths. Unlike Dynamo, wedge is
+  a real pass-through here (`wedge.kind: uniform` builds an actual tilt-range wedgelist;
+  `wedge.kind: none` assumes a full +-90 degree range, i.e. no missing-wedge weighting — CTF/
+  exposure weighting is always off project-wide, no per-tomogram defocus/dose metadata exists
+  for this dataset-agnostic pipeline to use). `seed` is a genuine reproducible seed (k-means
+  `random_state=seed`), like Dynamo/ProTomo. PC_TOP=10 default matches the source project's own
+  promoted default (native STOPGAP's is just the first 3 columns); `package_options.
+  stopgap.pc_cols` overrides it. Verified end-to-end against a real STOPGAP (compiled MCR
+  binaries) + MATLAB R2024a + OpenMPI install: the full embedding pipeline runs cleanly through
+  `stw run` (~96s on the tiny fixture), k=3 gives a non-degenerate split, embedding-cache reuse
+  across k is ~150x faster, two distinct masks build two distinct cached embeddings, and a
+  supplied uniform wedge really does reach the wedgelist. Found and honestly documented a real,
+  fixture-specific finding, unlike Dynamo's: no single eigen-projection column or small subset
+  examined here gets close to a clean class separation (best found, column 3 alone, reaches only
+  ARI~0.29 vs. Dynamo's ARI=1.0-on-one-column) — checked directly, not assumed, after confirming
+  the embedding pipeline itself is structurally correct; plausibly a genuine property of
+  real-space masked CC-matrix comparison responding differently than eigenvolume decomposition
+  to this particular synthetic fixture, not a port bug.
+- **M12 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
   JSON Schema, the requirements/capabilities report, JSONL progress events).
 
 ## Package install tiers
@@ -192,7 +227,7 @@ file tracks the public milestone sequence.
 | A | Vendored, always available | HAC Baseline, preview-mode ports |
 | B | A conda env from a checked-in `envs/<pkg>.yml` sets it up (`conda env create -f envs/<pkg>.yml -n <pkg>`, per that package's own `docs/install/<pkg>.md` — no dedicated `stw install` CLI command exists yet) | EMAN2, PyTom, **DISCA** (confirmed pip-installable PyTorch, no license/compile step; real training realistically needs a GPU though the code falls back to CPU) |
 | C | Detected, not auto-installed (no license needed, but no reliable conda/pip path — a source build) | PEET, **ProTomo** (no license itself, but its classification step needs a MATLAB install on the machine for its bundled MKL library — see `docs/install/protomo.md`), **RELION** (no trustworthy conda-forge/bioconda package exists; official install is a CMake source build) |
-| D | MATLAB-licensed and/or per-machine compile step | **Dynamo** (Parallel Computing Toolbox required, no CPU-only fallback), STOPGAP |
+| D | MATLAB-licensed and/or per-machine compile step | **Dynamo** (Parallel Computing Toolbox required, no CPU-only fallback), **STOPGAP** (MATLAB needed but, unlike Dynamo, no PCT license — parallelism is OS-level MPI) |
 
 TomoFlow and OPUS-TOMO are intentionally out of scope — both are too slow for a "quick"
 comparison tool.
