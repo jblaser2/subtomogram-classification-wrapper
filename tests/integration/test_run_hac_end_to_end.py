@@ -5,6 +5,7 @@ CI with nothing installed — it's the contract every future adapter's own
 end-to-end test should match.
 """
 import csv
+import os
 
 from stw.config import RunConfig
 from stw.orchestrator import run_config
@@ -61,6 +62,29 @@ def test_end_to_end_hac_run(tiny_fixture_dir, tmp_path):
     gt = _load_ground_truth(tiny_fixture_dir)
     score = score_against_ground_truth(gt, pred)
     assert score.ari > 0.8  # the fixture's structural difference should be easy
+
+
+def test_relative_out_dir_and_particles_resolve_to_absolute(tiny_fixture_dir, tmp_path, monkeypatch):
+    """Regression test for a real bug found via the GUI: a relative out_dir (the GUI
+    form's own default, "./stw_out") left job.workdir/cache_dir/mask_path relative,
+    which broke any adapter that runs a multi-step subprocess with cwd set to a
+    SUBDIRECTORY of out_dir (a relative path arg then re-resolves against the wrong
+    cwd). HAC never subprocesses, so this only checks the resolution itself -- the
+    subprocess-cwd-mismatch reproduction is a native EMAN2 test (needs a real install)."""
+    monkeypatch.chdir(tmp_path)
+    rel_particles = os.path.relpath(tiny_fixture_dir, tmp_path)
+    cfg = RunConfig.model_validate({
+        "particles": rel_particles,
+        "pattern": "particle_*.mrc",
+        "k": 2,
+        "mask": {"kind": "auto"},
+        "packages": ["hac"],
+        "out_dir": "stw_out",  # relative, matching stw gui's form default
+    })
+    report = run_config(cfg)
+    assert report.results[0]["status"] == "ok"
+    assert (tmp_path / "stw_out" / "run_report.json").exists()
+    assert (tmp_path / "stw_out" / "hac" / "k2" / "seed01" / "predictions.csv").exists()
 
 
 def test_dry_run_does_not_write_outputs(tiny_fixture_dir, tmp_path):

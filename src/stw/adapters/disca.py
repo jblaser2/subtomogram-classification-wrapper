@@ -122,6 +122,11 @@ class DISCAAdapter(Adapter):
     name = "disca"
     display_name = "DISCA"
     tier = InstallTier.B_CONDA
+    algorithm = (
+        "A YOPO convolutional feature extractor + Gaussian-mixture-model EM, trained "
+        "end to end per run (from the aitom toolkit) — a real deep-learning de novo "
+        "discovery method, not a classical distance/PCA approach like the others here."
+    )
     requirements = (
         Requirement(
             ReqKind.CONDA_ENV, _ENV,

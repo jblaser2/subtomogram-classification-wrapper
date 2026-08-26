@@ -6,6 +6,13 @@ const jobRows = {}; // "package|k|seed" isn't known until finish_job; keyed by p
 
 // ---------- package picker ----------
 
+function kLimitNote(caps) {
+  if (!caps.variable_k) return "fixed k";
+  const [lo, hi] = caps.k_range;
+  if (hi != null) return `k ${lo}–${hi} only`;
+  return "";
+}
+
 async function loadPackages() {
   const res = await fetch("/api/packages");
   const packages = await res.json();
@@ -19,11 +26,16 @@ async function loadPackages() {
       ? "requirements satisfied"
       : "missing requirements: " + pkg.checks.filter((c) => !c.ok && !c.optional).map((c) => c.message).join("; ");
     row.title = title;
+    const kNote = kLimitNote(pkg.capabilities);
     row.innerHTML = `
-      <input type="checkbox" value="${pkg.name}" ${pkg.installed ? "checked" : ""}>
-      <span class="dot ${dotClass}"></span>
-      <span class="pkg-name">${pkg.display_name}</span>
-      <span class="pkg-tier">${pkg.tier}</span>
+      <div class="pkg-row-top">
+        <input type="checkbox" value="${pkg.name}" ${pkg.installed ? "checked" : ""}>
+        <span class="dot ${dotClass}"></span>
+        <span class="pkg-name">${pkg.display_name}</span>
+        <span class="pkg-tier">${pkg.tier}</span>
+        ${kNote ? `<span class="pkg-k-note">${kNote}</span>` : ""}
+      </div>
+      ${pkg.algorithm ? `<div class="pkg-algo">${pkg.algorithm}</div>` : ""}
     `;
     container.appendChild(row);
   }
@@ -254,10 +266,48 @@ function viewPanel(pkg, k, seed) {
   el.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
+// ---------- dataset preview ----------
+
+async function previewDataset() {
+  const box = $("preview-result");
+  box.className = "";
+  box.textContent = "Loading…";
+
+  const body = {
+    particles: $("f-particles").value,
+    pattern: $("f-pattern").value,
+    pixel_size: numOrNull("f-pixel-size"),
+  };
+  if (!body.particles) {
+    box.className = "error";
+    box.textContent = "particle directory is required";
+    return;
+  }
+
+  const res = await fetch("/api/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({ detail: res.statusText }));
+    box.className = "error";
+    box.textContent = detail.detail;
+    return;
+  }
+  const d = await res.json();
+  box.className = "preview-box";
+  box.innerHTML = `
+    <div class="preview-specs">${d.n_particles} particles &middot; box ${d.box}&sup3; &middot; ${d.pixel_size.toFixed(3)} Å/px</div>
+    <img class="panel-img" src="data:image/png;base64,${d.preview_png_base64}">
+  `;
+}
+
 // ---------- init ----------
 
 document.addEventListener("DOMContentLoaded", () => {
   wireConditionalFields();
   loadPackages();
+  $("preview-btn").addEventListener("click", previewDataset);
   $("run-btn").addEventListener("click", startRun);
 });

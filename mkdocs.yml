@@ -32,6 +32,7 @@ nav:
   - Quickstart: quickstart.md
   - Config reference: config-reference.md
   - Designing a mask: mask-design.md
+  - What each package does: packages.md
   - GUI: gui.md
   - Limitations: limitations.md
   - Installing packages:

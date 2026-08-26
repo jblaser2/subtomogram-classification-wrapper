@@ -176,6 +176,11 @@ class RELIONAdapter(Adapter):
     name = "relion"
     display_name = "RELION"
     tier = InstallTier.C_GUIDED  # no reliable conda-forge/bioconda package exists; a CMake source build
+    algorithm = (
+        "relion_refine's real 3D classification (Class3D): regularized maximum-likelihood "
+        "expectation-maximization in Fourier space over k 3D references, orientation "
+        "search disabled (assumes pre-aligned input)."
+    )
     requirements = (
         Requirement(
             ReqKind.EXECUTABLE, _BINARY, detail=_COMMON_DIRS,

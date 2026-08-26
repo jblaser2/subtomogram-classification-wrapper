@@ -205,6 +205,11 @@ class ProTomoAdapter(Adapter):
     name = "protomo"
     display_name = "ProTomo"
     tier = InstallTier.C_GUIDED
+    algorithm = (
+        "I3/ProTomo's real subvolsvd.sh (SVD/multi-statistical-analysis on masked "
+        "per-particle differences) + subvolhac.sh (Ward-linkage hierarchical "
+        "clustering in the SVD's factor space, cut to k classes)."
+    )
     requirements = (
         Requirement(
             ReqKind.PATH_EXISTS, _DEFAULT_SETUP,

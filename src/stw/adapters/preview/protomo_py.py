@@ -33,6 +33,10 @@ class ProtomoPreviewAdapter(Adapter):
     name = "protomo-preview"
     display_name = "ProTomo (preview approximation)"
     tier = InstallTier.A_VENDORED
+    algorithm = (
+        "A lightweight, dependency-free Python approximation of ProTomo's SVD/HAC "
+        "pipeline — not real ProTomo, for a zero-install rough comparison only."
+    )
     requirements = ()
     steps = ("classify",)
     capabilities = Capabilities(

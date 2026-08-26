@@ -4,6 +4,7 @@ PNG per request (cheap — a handful of small central-slice images). Requires
 the `viz` extra (matplotlib); the `gui` extra already pulls it in."""
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import mrcfile
@@ -33,3 +34,24 @@ def render_class_average_panel(
     Path(out_png).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(str(out_png), dpi=130, bbox_inches="tight")
     plt.close(fig)
+
+
+def render_volume_slice_png(vol: np.ndarray, title: str) -> bytes:
+    """Central Z-slice of one volume, returned as in-memory PNG bytes (no
+    filesystem write -- used for the dataset preview, which isn't tied to
+    any run and has nothing sensible to cache it under)."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    mid = vol.shape[0] // 2
+    fig, ax = plt.subplots(figsize=(3.6, 3.6))
+    ax.imshow(vol[mid], cmap="gray")
+    ax.set_title(title, fontsize=10)
+    ax.axis("off")
+    fig.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    return buf.getvalue()

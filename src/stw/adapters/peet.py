@@ -149,6 +149,11 @@ class PEETAdapter(Adapter):
     name = "peet"
     display_name = "PEET"
     tier = InstallTier.C_GUIDED
+    algorithm = (
+        "PEET's real WMD-PCA + native clusterPca k-means, driven through averageAll -> "
+        "pca -> clusterPca -> usePcaMotiveLists — weighted multivariate-data PCA on "
+        "masked per-particle differences, then PEET's own k-means in PCA space."
+    )
     requirements = (
         Requirement(
             ReqKind.PATH_EXISTS, _DEFAULT_IMOD_SETUP,

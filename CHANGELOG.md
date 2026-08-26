@@ -113,6 +113,15 @@ All notable changes to this project are documented here.
   (`stw.gui.render`, cached to disk on first request); the cross-package comparison figure
   is served directly. Single-user, in-memory run registry, no persistence beyond the
   process lifetime. `docs/gui.md` added.
+- **Dataset preview** in `stw gui`: a "Preview dataset" button loads the particle set
+  (no run started) and shows particle count, box size, pixel size, and a central-slice
+  PNG of the unweighted global average, so a config can be sanity-checked before
+  committing to a full run (`POST /api/preview`, `render_volume_slice_png`).
+- **Per-package algorithm summaries**: every adapter now declares a one-to-two-sentence
+  `algorithm` ClassVar describing the real classification method it drives, surfaced in
+  `stw gui`'s package picker (along with a `k range`/`fixed k` badge for capability-
+  limited adapters like `pytom-preview`'s validated-only k=2) and consolidated in a new
+  `docs/packages.md` overview page (linked from the GUI and from `README.md`).
 
 ### Fixed
 - PyTom's `mpirun` call failed outright inside a container (OpenMPI's `prterun` refuses to run
@@ -164,3 +173,18 @@ All notable changes to this project are documented here.
   path, for the same reason already found and fixed for ProTomo: the matlab subprocess's `cwd`
   is the embedding cache dir, not the invoking cwd, so a relative particle path resolved to the
   wrong location. Fixed by resolving it to absolute before interpolating into the MATLAB call.
+- A real, project-wide bug found via `stw gui` (whose form defaults to a relative
+  `./stw_out`, the first thing to actually exercise this): `run_config()` never resolved
+  a relative `out_dir` to absolute, so `job.workdir`/`job.cache_dir`/`mask_path` — and
+  therefore anything derived from them, e.g. EMAN2's mask path or PyTom's particle-list
+  output path — stayed relative too. Any adapter that runs a multi-step subprocess with
+  `cwd` set to a *subdirectory* of `out_dir` (EMAN2, PyTom, and others) then re-resolved
+  that same relative path against the wrong cwd, landing in a nonexistent nested location
+  and failing outright. Fixed at the root: `out_dir` (in `orchestrator.run_config()`) and
+  `particles.particle_dir` (in `ParticleSet.discover()`) are now resolved to absolute
+  once, at the top, fixing every adapter at once rather than patching each one's own
+  subprocess calls individually.
+- `PackageResult.to_dict()` stringified `class_averages`' keys but left `n_per_class`'s
+  keys as `int` — any caller keying off both together (the GUI's class-average panel
+  renderer, which needs a class's particle count to label its slice) saw a type mismatch
+  and always fell back to `n=?`. Both now consistently str-keyed.

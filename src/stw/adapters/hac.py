@@ -32,6 +32,11 @@ class HACBaselineAdapter(Adapter):
     name = "hac"
     display_name = "HAC Baseline"
     tier = InstallTier.A_VENDORED
+    algorithm = (
+        "Pearson correlation-coefficient distance between every particle pair, then "
+        "Ward-linkage hierarchical clustering cut to k classes — a generic, "
+        "package-independent control, not tied to any real classification software."
+    )
     requirements = ()  # numpy/scipy/mrcfile are stw's own core dependencies
     steps = ("load", "distance_matrix", "cluster", "class_averages")
     capabilities = Capabilities(

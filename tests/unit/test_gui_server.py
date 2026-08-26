@@ -115,6 +115,64 @@ def test_full_run_via_http_api(client, tiny_fixture_dir, tmp_path):
     assert len(res.content) > 0
 
 
+def test_panel_titles_show_real_particle_counts_not_question_marks(client, tiny_fixture_dir, tmp_path, monkeypatch):
+    """Regression test for the n=? bug: render_class_average_panel must be handed
+    class_averages/n_per_class with matching key types (see test_results.py)."""
+    captured = {}
+    from stw.gui import render as render_module
+
+    original = render_module.render_class_average_panel
+
+    def spy(class_averages, n_per_class, out_png, title):
+        captured["class_averages"] = class_averages
+        captured["n_per_class"] = n_per_class
+        return original(class_averages, n_per_class, out_png, title)
+
+    monkeypatch.setattr(render_module, "render_class_average_panel", spy)
+
+    body = {
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "pixel_size": 5.0,
+        "k": 2, "seeds": 1, "mask": {"kind": "sphere", "radius": 9.0},
+        "packages": ["hac"], "out_dir": str(tmp_path / "out"),
+    }
+    res = client.post("/api/runs", json=body)
+    run_id = res.json()["run_id"]
+    with client.stream("GET", f"/api/runs/{run_id}/events") as resp:
+        for line in resp.iter_lines():
+            if line.startswith("data: ") and '"run_complete"' in line:
+                break
+
+    res = client.get(f"/api/runs/{run_id}/panel/hac/2/1")
+    assert res.status_code == 200
+    assert set(captured["class_averages"].keys()) == set(captured["n_per_class"].keys())
+    assert all(captured["n_per_class"][k] > 0 for k in captured["n_per_class"])
+
+
+def test_preview_dataset_returns_specs_and_png(client, tiny_fixture_dir):
+    res = client.post("/api/preview", json={
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "pixel_size": 5.0,
+    })
+    assert res.status_code == 200
+    d = res.json()
+    assert d["n_particles"] == 32
+    assert d["box"] == 24
+    assert d["pixel_size"] == 5.0
+    assert len(d["preview_png_base64"]) > 0
+
+
+def test_preview_dataset_rejects_bad_particle_dir(client):
+    res = client.post("/api/preview", json={"particles": "/definitely/not/a/real/dir"})
+    assert res.status_code == 422
+
+
+def test_packages_expose_algorithm_summary(client):
+    res = client.get("/api/packages")
+    packages = {p["name"]: p for p in res.json()}
+    assert packages["stopgap"]["algorithm"]
+    assert "hierarchical" in packages["hac"]["algorithm"]
+    assert packages["pytom-preview"]["capabilities"]["k_range"] == [2, 2]
+
+
 def test_comparison_png_404s_with_only_one_successful_package(client, tiny_fixture_dir, tmp_path):
     """build_comparison needs >=2 successful results (same rule the orchestrator
     itself enforces) -- a single-package run has no comparison figure at all."""

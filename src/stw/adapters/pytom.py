@@ -103,6 +103,12 @@ class PyTomAdapter(Adapter):
     name = "pytom"
     display_name = "PyTom"
     tier = InstallTier.B_CONDA
+    algorithm = (
+        "auto_focus_classify_nofrm.py: iterative reference-pair difference-map "
+        "classification — starts from k random references, alternates masked-NCC "
+        "particle assignment with recomputing per-cluster averages and the mask "
+        "region that best discriminates each reference pair."
+    )
     requirements = (
         Requirement(
             ReqKind.CONDA_ENV, _ENV,

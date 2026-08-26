@@ -107,7 +107,11 @@ class ParticleSet:
     ) -> ParticleSet:
         import mrcfile
 
-        d = Path(particle_dir)
+        # .resolve(): several adapters pass job.particles.particle_dir as a subprocess
+        # ARGUMENT while running that subprocess with a different cwd -- a relative path
+        # here would re-resolve against the wrong directory (the same class of bug fixed
+        # for out_dir in orchestrator.run_config()).
+        d = Path(particle_dir).resolve()
         if not d.is_dir():
             raise ParticleSetError(f"particle directory does not exist: {d}")
         files = sorted(p.name for p in d.glob(pattern))

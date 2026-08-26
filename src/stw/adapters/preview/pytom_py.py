@@ -31,6 +31,12 @@ class PyTomPreviewAdapter(Adapter):
     name = "pytom-preview"
     display_name = "PyTom (preview approximation)"
     tier = InstallTier.A_VENDORED
+    algorithm = (
+        "A lightweight, dependency-free Python approximation of PyTom's iterative "
+        "reference-pair difference-map classifier — not real PyTom, for a zero-install "
+        "rough comparison only. k>2 voting logic is real but not validated against real "
+        "PyTom, so k is capped at 2."
+    )
     requirements = ()
     steps = ("classify",)
     capabilities = Capabilities(

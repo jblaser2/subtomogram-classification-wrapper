@@ -163,6 +163,11 @@ class STOPGAPAdapter(Adapter):
     name = "stopgap"
     display_name = "STOPGAP"
     tier = InstallTier.D_LICENSED
+    algorithm = (
+        "STOPGAP's real CC-matrix PCA: rigid-body pre-rotation (rot_vol) -> pairwise "
+        "correlation matrix (calc_ccmat) -> eigendecomposition (calc_pca_ccmat), then "
+        "k-means on the top eigen-projections."
+    )
     requirements = (
         Requirement(
             ReqKind.PATH_EXISTS, str(Path(_DEFAULT_STOPGAP_HOME) / "sg_toolbox"),

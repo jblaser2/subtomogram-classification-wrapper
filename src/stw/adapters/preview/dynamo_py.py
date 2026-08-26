@@ -31,6 +31,11 @@ class DynamoPreviewAdapter(Adapter):
     name = "dynamo-preview"
     display_name = "Dynamo (preview approximation)"
     tier = InstallTier.A_VENDORED
+    algorithm = (
+        "A lightweight, dependency-free Python approximation of Dynamo's dpkpca "
+        "(masked-difference PCA + k-means) — not real Dynamo, for a zero-install "
+        "rough comparison only."
+    )
     requirements = ()
     steps = ("classify",)
     capabilities = Capabilities(

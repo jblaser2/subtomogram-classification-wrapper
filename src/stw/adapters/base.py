@@ -38,6 +38,11 @@ class Adapter(ABC):
     capabilities: ClassVar[Capabilities]
     requirements: ClassVar[tuple[Requirement, ...]] = ()
     steps: ClassVar[tuple[str, ...]] = ("run",)
+    # One or two plain-language sentences on the real classification algorithm this
+    # adapter drives -- surfaced by `stw gui`'s package picker and docs/packages.md so
+    # "what does this package actually do" doesn't require reading adapter source or
+    # docstrings. Every adapter should set this; the empty default is only a fallback.
+    algorithm: ClassVar[str] = ""
     progress_patterns: ClassVar[tuple[tuple[re.Pattern, str], ...]] = ()
 
     # --- pre-flight only; must never launch the package -----------------

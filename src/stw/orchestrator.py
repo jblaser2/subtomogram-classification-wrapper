@@ -78,7 +78,13 @@ def run_config(config: RunConfig, *, progress: ProgressSink | None = None, dry_r
         tilt_axis=config.wedge.tilt_axis, table=config.wedge.table,
     )
 
-    out_dir = Path(config.out_dir)
+    # .resolve(): a relative out_dir must become absolute here, once, since every job's
+    # workdir/cache_dir/mask_path derives from it and several adapters run multi-step
+    # subprocesses with cwd set to a SUBDIRECTORY of out_dir -- a relative path passed as
+    # a subprocess *argument* in that situation re-resolves against the new cwd, landing
+    # in a nonexistent nested location (found via the GUI's relative "./stw_out" default,
+    # but a bug in this shared code path, affecting the CLI equally for a relative out_dir).
+    out_dir = Path(config.out_dir).resolve()
     cache_root = out_dir / "_cache"
     mask_path = None if dry_run else resolve_mask(mask_spec, particles, cache_root)
 

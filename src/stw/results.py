@@ -35,7 +35,10 @@ class PackageResult:
             "predictions": str(self.predictions) if self.predictions else None,
             "class_averages": {str(k): str(v) for k, v in self.class_averages.items()},
             "class_average_panel": str(self.class_average_panel) if self.class_average_panel else None,
-            "n_per_class": self.n_per_class,
+            # str-keyed to match class_averages above -- class_average_panel rendering (and
+            # any other caller keying off both dicts together) needs the same key type in
+            # both, and JSON object keys must be strings anyway.
+            "n_per_class": {str(k): v for k, v in self.n_per_class.items()},
             "elapsed_sec": self.elapsed_sec,
             "log": str(self.log) if self.log else None,
             "error": self.error,

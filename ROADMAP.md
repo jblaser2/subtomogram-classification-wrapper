@@ -243,6 +243,22 @@ file tracks the public milestone sequence.
   and the comparison figure correctly 404ing when fewer than two packages succeed (the same
   rule the orchestrator itself enforces).
 
+  **Post-first-draft fixes (2026-08-26), found via actually using the GUI**: two real,
+  project-wide (not GUI-specific) bugs the GUI was the first thing to actually exercise.
+  (1) `run_config()` never resolved a relative `out_dir` to absolute — the GUI form's own
+  `./stw_out` default was the first realistic case, and any adapter running a subprocess
+  with `cwd` set to a subdirectory of `out_dir` (EMAN2, PyTom) re-resolved a relative path
+  argument against the wrong cwd and failed outright. Fixed at the root in
+  `orchestrator.run_config()`/`ParticleSet.discover()`, not per-adapter. (2)
+  `PackageResult.to_dict()` stringified `class_averages`' keys but not `n_per_class`'s,
+  so the GUI's class-average panel always showed `n=?`. Both have regression tests
+  (`tests/integration/test_run_hac_end_to_end.py`, `tests/native/test_eman2_real.py`,
+  `tests/unit/test_results.py`, `tests/unit/test_gui_server.py`). Also added: a "Preview
+  dataset" step (particle count/box/pixel size + a central-slice image of the unweighted
+  global average, before committing to a full run) and a per-package `algorithm` summary
+  (shown in the picker, plus a `docs/packages.md` overview page) so "what does this
+  package actually do" doesn't require reading source.
+
 ## Package install tiers
 
 | Tier | Meaning | Packages |

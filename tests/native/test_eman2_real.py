@@ -84,3 +84,28 @@ def test_eman2_prep_is_cached_across_runs(tiny_fixture_dir, tmp_path):
     second_elapsed = json.loads(report_path.read_text())["results"][0]["elapsed_sec"]
 
     assert second_elapsed < first_elapsed
+
+
+def test_eman2_relative_out_dir_regression(tiny_fixture_dir, tmp_path, monkeypatch):
+    """Regression test for a real bug found via the GUI (relative out_dir, e.g. the
+    GUI form's own "./stw_out" default): mask_convert's subprocess runs with cwd set
+    to prep_dir (a subdirectory of out_dir), and was passed job.mask_path -- itself
+    derived from the SAME relative out_dir -- as a plain string argument. A relative
+    mask_path there re-resolved against prep_dir, not the invoking cwd, landing at a
+    nonexistent nested path and failing outright (rc=1). Fixed in orchestrator.py by
+    resolving out_dir to absolute once, at the top of run_config()."""
+    _skip_if_not_installed()
+    monkeypatch.chdir(tmp_path)
+    import os
+
+    rel_particles = os.path.relpath(tiny_fixture_dir, tmp_path)
+    cfg = RunConfig.model_validate({
+        "particles": rel_particles,
+        "pattern": "particle_*.mrc",
+        "k": 2,
+        "mask": {"kind": "sphere", "radius": 9.0},
+        "packages": ["eman2"],
+        "out_dir": "stw_out",
+    })
+    report = run_config(cfg)
+    assert report.results[0]["status"] == "ok"

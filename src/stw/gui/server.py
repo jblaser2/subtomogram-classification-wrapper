@@ -26,9 +26,11 @@ from pathlib import Path
 from typing import Any
 
 from stw.adapters import registry
+from stw.averaging import global_average
 from stw.capabilities import Capabilities
 from stw.config import RunConfig
 from stw.orchestrator import run_config
+from stw.spec import ParticleSet, ParticleSetError
 
 
 class QueueProgressSink:
@@ -113,6 +115,7 @@ def create_app():
             out.append({
                 **report.to_dict(),
                 "name": name,
+                "algorithm": adapter_cls.algorithm,
                 "capabilities": _caps_to_dict(adapter_cls.capabilities),
             })
         return out
@@ -120,6 +123,32 @@ def create_app():
     @app.get("/api/schema")
     def schema() -> dict:
         return RunConfig.model_json_schema()
+
+    @app.post("/api/preview")
+    def preview_dataset(body: dict[str, Any]) -> dict:
+        """Loads the particle set (no run started) and returns its specs plus a
+        central-slice PNG of the unweighted global average, so a config can be
+        sanity-checked before committing to a full run."""
+        import base64
+
+        from stw.gui.render import render_volume_slice_png
+
+        particles_dir = body.get("particles", "")
+        pattern = body.get("pattern") or "*.mrc"
+        pixel_size = body.get("pixel_size")
+        try:
+            particles = ParticleSet.discover(particles_dir, pattern, pixel_size)
+        except ParticleSetError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+
+        avg = global_average(particles.particle_dir, list(particles.files))
+        png_bytes = render_volume_slice_png(avg, title=f"global average, n={len(particles.files)}")
+        return {
+            "n_particles": len(particles.files),
+            "box": particles.box,
+            "pixel_size": particles.pixel_size,
+            "preview_png_base64": base64.b64encode(png_bytes).decode("ascii"),
+        }
 
     @app.post("/api/runs")
     def start_run(body: dict[str, Any]) -> dict:
