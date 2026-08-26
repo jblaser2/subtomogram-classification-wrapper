@@ -176,3 +176,16 @@ set) but the same runtime concern applies directly: hours per seed at real
 dataset scale, versus seconds-to-minutes for every other package wired up so
 far. It should never be part of any `--all`/default package set — always opt
 into it explicitly.
+
+## The GUI is local-only, single-user, no auth — by design, not a gap
+
+`stw gui` (see `docs/gui.md`) has no login, no per-user isolation, and no
+persistence beyond the server process's lifetime — restarting it forgets
+every past run (though the on-disk `run_report.json`/predictions/class
+averages from those runs are untouched). This is intentional: it binds
+`127.0.0.1` by default and is meant to be launched and used by one person on
+their own workstation, the same way `napari` or `tensorboard` are — not
+deployed anywhere or exposed beyond localhost. `--host 0.0.0.0` exists for a
+trusted LAN, but the GUI executes real local shell commands (conda, MATLAB,
+mpiexec, ...) with zero authentication, so it should never be reachable from
+an untrusted network.

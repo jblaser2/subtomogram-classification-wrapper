@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>stw</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1>stw <span class="subtitle">subtomogram classification wrapper</span></h1>
+</header>
+
+<main>
+  <section class="panel" id="config-panel">
+    <h2>1. Particles</h2>
+    <label>Particle directory
+      <input type="text" id="f-particles" placeholder="/path/to/particles">
+    </label>
+    <div class="row">
+      <label>Filename pattern
+        <input type="text" id="f-pattern" value="*.mrc">
+      </label>
+      <label>Pixel size (Å, optional)
+        <input type="number" step="any" id="f-pixel-size" placeholder="from header">
+      </label>
+    </div>
+    <label>Alignment state
+      <select id="f-alignment-state">
+        <option value="fine" selected>fine (pre-aligned)</option>
+        <option value="rough">rough</option>
+        <option value="unaligned">unaligned</option>
+      </select>
+    </label>
+
+    <h2>2. Mask</h2>
+    <label>Kind
+      <select id="f-mask-kind">
+        <option value="auto" selected>auto (blind density envelope)</option>
+        <option value="sphere">sphere</option>
+        <option value="cylinder">cylinder</option>
+        <option value="file">file</option>
+        <option value="none">none</option>
+      </select>
+    </label>
+    <div class="row" id="mask-sphere-fields">
+      <label>Radius (voxels)
+        <input type="number" step="any" id="f-mask-radius">
+      </label>
+    </div>
+    <div class="row hidden" id="mask-cylinder-fields">
+      <label>Half-height (voxels)
+        <input type="number" step="any" id="f-mask-half-height">
+      </label>
+      <label>Axis
+        <select id="f-mask-axis">
+          <option value="z" selected>z</option>
+          <option value="y">y</option>
+          <option value="x">x</option>
+        </select>
+      </label>
+    </div>
+    <div class="row hidden" id="mask-file-fields">
+      <label>Mask MRC path
+        <input type="text" id="f-mask-path">
+      </label>
+    </div>
+
+    <h2>3. Wedge</h2>
+    <label>Kind
+      <select id="f-wedge-kind">
+        <option value="none" selected>none (no missing-wedge weighting)</option>
+        <option value="uniform">uniform (same tilt range every particle)</option>
+      </select>
+    </label>
+    <div class="row hidden" id="wedge-uniform-fields">
+      <label>Tilt min (°)
+        <input type="number" step="any" id="f-tilt-min" value="-60">
+      </label>
+      <label>Tilt max (°)
+        <input type="number" step="any" id="f-tilt-max" value="60">
+      </label>
+    </div>
+
+    <h2>4. Classification</h2>
+    <div class="row">
+      <label>k (comma-separated for a sweep)
+        <input type="text" id="f-k" value="2">
+      </label>
+      <label>Seeds (a count, or comma-separated list)
+        <input type="text" id="f-seeds" value="1">
+      </label>
+    </div>
+    <div class="row">
+      <label>Mode
+        <select id="f-mode">
+          <option value="native" selected>native</option>
+          <option value="preview">preview (no install needed)</option>
+        </select>
+      </label>
+      <label>Output directory
+        <input type="text" id="f-out-dir" value="./stw_out">
+      </label>
+    </div>
+
+    <h2>5. Packages</h2>
+    <div id="package-picker">Loading packages…</div>
+
+    <button id="run-btn" type="button">Run</button>
+    <div id="submit-error" class="error hidden"></div>
+  </section>
+
+  <section class="panel" id="progress-panel">
+    <h2>Progress</h2>
+    <div id="progress-list" class="muted">Nothing running yet.</div>
+  </section>
+
+  <section class="panel" id="results-panel">
+    <h2>Results</h2>
+    <div id="results-body" class="muted">No results yet.</div>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>

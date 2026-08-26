@@ -217,8 +217,31 @@ file tracks the public milestone sequence.
   the embedding pipeline itself is structurally correct; plausibly a genuine property of
   real-space masked CC-matrix comparison responding differently than eigenvolume decomposition
   to this particular synthetic fixture, not a port bug.
-- **M12 — GUI**, deferred until after v0.1, built on the same core library (`RunConfig`'s
-  JSON Schema, the requirements/capabilities report, JSONL progress events).
+- [x] **M12 — GUI**, a local web app (`stw gui`, FastAPI + a vanilla-JS/no-build-step
+  frontend), not a native Qt/desktop build — the GUI's job (a config form, a
+  requirements/install-status panel, a live progress dashboard) is forms-and-tables, not
+  graphics, so avoiding a heavy Qt dependency for a napari-like "launches from the
+  terminal, feels local" experience was the better tradeoff; `docs/gui.md` records this
+  decision. Binds `127.0.0.1` by default (no auth, runs local shell commands — never meant
+  to be exposed beyond localhost). Never a second implementation of anything: the same
+  `RunConfig`/`registry()`/`run_config()` core the CLI already uses, and a second
+  `ProgressSink` implementation (`QueueProgressSink`, pushing into an in-memory queue)
+  alongside the existing `RichProgressSink`/`JsonlProgressSink`, streamed to the browser as
+  Server-Sent Events. Single-user, local-only, no persistence beyond the process lifetime
+  (an in-memory `RUNS` registry + a background `threading.Thread` per run — `run_config` is
+  blocking and mostly waits on subprocesses, so this needed no async rewrite). Class
+  averages are rendered to a PNG panel on demand (MRCs aren't browser-displayable) and
+  cached to disk on first request; the cross-package comparison figure is served directly
+  since it's already a PNG. The config form is hand-written against `RunConfig`'s known,
+  stable field set rather than generically generated from `RunConfig.model_json_schema()`
+  (still exposed at `/api/schema`, matching the original design intent, just not consumed
+  by the frontend yet) — a fully generic JSON-schema-to-form renderer was judged not worth
+  building for a "first draft" with a small, well-known field set. Verified end-to-end
+  through the real HTTP API (FastAPI `TestClient`, no browser needed): package listing with
+  live install status, a full HAC Baseline run through submit -> SSE progress stream ->
+  report -> rendered class-average panel, config-validation errors surfacing as real 422s,
+  and the comparison figure correctly 404ing when fewer than two packages succeed (the same
+  rule the orchestrator itself enforces).
 
 ## Package install tiers
 

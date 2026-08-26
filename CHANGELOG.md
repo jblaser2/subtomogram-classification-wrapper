@@ -104,6 +104,15 @@ All notable changes to this project are documented here.
   full pipeline runs cleanly (~96s on the fixture), k=3 non-degeneracy, ~150x faster cached
   rerun across k, two distinct masks build two distinct cached embeddings, and a supplied
   uniform wedge reaches the wedgelist. `docs/install/stopgap.md` added.
+- **`stw gui`** — a local web GUI (new `gui` extra: FastAPI + uvicorn), not a native
+  desktop build: binds `127.0.0.1` by default, opens a browser tab, and drives the exact
+  same `RunConfig`/`registry()`/`run_config()` core the CLI uses. A new `QueueProgressSink`
+  (`stw.gui.server`) implements the same `ProgressSink` protocol as `RichProgressSink`/
+  `JsonlProgressSink`, streaming live per-package progress to the browser over
+  Server-Sent Events. Class-average MRCs are rendered to a PNG panel on demand
+  (`stw.gui.render`, cached to disk on first request); the cross-package comparison figure
+  is served directly. Single-user, in-memory run registry, no persistence beyond the
+  process lifetime. `docs/gui.md` added.
 
 ### Fixed
 - PyTom's `mpirun` call failed outright inside a container (OpenMPI's `prterun` refuses to run

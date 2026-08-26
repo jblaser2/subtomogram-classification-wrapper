@@ -32,6 +32,7 @@ nav:
   - Quickstart: quickstart.md
   - Config reference: config-reference.md
   - Designing a mask: mask-design.md
+  - GUI: gui.md
   - Limitations: limitations.md
   - Installing packages:
       - EMAN2: install/eman2.md

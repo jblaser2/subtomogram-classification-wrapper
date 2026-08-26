@@ -10,8 +10,9 @@ each package's own CLI, file formats, and quirks one at a time.
 > **Dynamo**, **DISCA**, **STOPGAP** — all verified end-to-end against real installs) all work — try
 > `stw list`. PyTom and RELION both have a genuinely working missing-wedge pass-through. DISCA
 > is real but genuinely slow (hours/seed at real dataset scale) — never include it in a
-> default/`--all` package set. See [`ROADMAP.md`](ROADMAP.md) for the full plan and
-> [`docs/limitations.md`](docs/limitations.md) for what this tool does and doesn't do yet.
+> default/`--all` package set. A local web GUI (`stw gui`, needs the `gui` extra) is also
+> up — see [`docs/gui.md`](docs/gui.md). See [`ROADMAP.md`](ROADMAP.md) for the full plan
+> and [`docs/limitations.md`](docs/limitations.md) for what this tool does and doesn't do yet.
 
 ## Why
 
@@ -67,6 +68,10 @@ a prebuilt image with both already set up is available too, see [`docker/README.
 Others (RELION, PEET, Dynamo, STOPGAP, ProTomo) have no conda/pip path at all — a from-source
 build, IMOD, a MATLAB license, or a closed compiled binary — that `stw` can only detect and
 guide you through, not install for you.
+
+Prefer a GUI over YAML? `pip install ".[gui]"` then `stw gui` — a local web app (like
+launching `napari` from the terminal) covering the same config, package picker, and live
+progress the CLI has. See [`docs/gui.md`](docs/gui.md).
 
 ## Documentation
 
