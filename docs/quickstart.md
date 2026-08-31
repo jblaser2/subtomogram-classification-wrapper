@@ -37,10 +37,14 @@ Outputs land in `out_dir`:
 - `<package>/k<k>/seed<NN>/predictions.csv` — the actual class assignments: `particle,class_int,class_name`
 - `<package>/k<k>/seed<NN>/class_averages/*.mrc` — one averaged volume per class
 - `<package>/k<k>/seed<NN>/run.log` (+ `.timing.json`) — that job's own subprocess log and wall-clock time
-- `<package>/_cache/` — expensive intermediate artifacts shared across every `k`/seed for that
-  package (native-format conversions, prep steps, embeddings) — safe to delete to reclaim disk;
-  everything in it is recomputed on the next run that needs it
-- `_cache/mask_<hash>.mrc` (+ `.overlay.png`) — the one resolved mask every package in the run shares
+- `<package>/_cache/<particle-set fingerprint>/` — expensive intermediate artifacts shared across
+  every `k`/seed for that package and particle set (native-format conversions, prep steps,
+  embeddings) — safe to delete to reclaim disk; everything in it is recomputed on the next run
+  that needs it. The fingerprint subdirectory (a hash of the particle directory/pattern/file
+  list/box/pixel size) means reusing the same `out_dir` for a *different* dataset never reuses
+  the wrong one's cached prep — each dataset gets its own subdirectory automatically.
+- `_cache/<particle-set fingerprint>/mask_<hash>.mrc` (+ `.overlay.png`) — the one resolved mask
+  every package in the run shares
 - `comparison/cross_package.png` — cross-package agreement matrix (needs >= 2 successful packages)
 - `run_report.json` / `summary.md` — everything above plus preflight results, warnings, and timing,
   in one place

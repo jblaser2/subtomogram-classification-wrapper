@@ -129,10 +129,51 @@ def test_resume_reuses_cached_mask_and_distance_matrix(tiny_fixture_dir, tmp_pat
         }
     )
     run_config(cfg)
-    cache_files_after_first = sorted((out_dir / "hac" / "_cache").glob("*.npy"))
+    # rglob, not glob: cache_dir is now out_dir/hac/_cache/<particle-set fingerprint>/...
+    cache_files_after_first = sorted((out_dir / "hac" / "_cache").rglob("*.npy"))
     assert cache_files_after_first
 
     mtime_before = cache_files_after_first[0].stat().st_mtime
     run_config(cfg)  # second run should hit the cache, not recompute
     mtime_after = cache_files_after_first[0].stat().st_mtime
     assert mtime_before == mtime_after
+
+
+def test_different_particle_sets_sharing_out_dir_get_distinct_caches(tiny_fixture_dir, tmp_path):
+    """Regression test for a real bug found via the GUI: switching to a different
+    dataset while reusing the same out_dir silently (or, for adapters with a hard
+    particle-existence check like PyTom's, loudly with "class(es) with zero
+    particles") reused cached prep built from the OTHER dataset -- no adapter's own
+    caching accounted for particle-set identity, only the shared cache_dir/cache_root
+    orchestrator.run_config() computes did, after this fix."""
+    import mrcfile
+    import numpy as np
+
+    out_dir = tmp_path / "out"
+
+    # A second, smaller synthetic particle set -- deliberately a different particle
+    # count than tiny_fixture_dir's 32, so a stale cache hit would surface loudly
+    # (a cached CC-matrix sized for the wrong particle count) rather than silently.
+    other_dir = tmp_path / "other_particles"
+    other_dir.mkdir()
+    rng = np.random.default_rng(0)
+    for i in range(8):
+        with mrcfile.new(other_dir / f"p_{i:02d}.mrc", overwrite=True) as m:
+            m.set_data(rng.normal(size=(24, 24, 24)).astype("float32"))
+            m.voxel_size = 5.0
+
+    mask = {"kind": "sphere", "radius": 9}
+    run_config(RunConfig.model_validate({
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "k": 2,
+        "packages": ["hac"], "out_dir": str(out_dir), "mask": mask,
+    }))
+    report2 = run_config(RunConfig.model_validate({
+        "particles": str(other_dir), "pattern": "*.mrc", "k": 2,
+        "packages": ["hac"], "out_dir": str(out_dir), "mask": mask,
+    }))
+
+    assert report2.results[0]["status"] == "ok"
+    assert sum(report2.results[0]["n_per_class"].values()) == 8  # the SECOND dataset's own count
+
+    fingerprint_dirs = [d for d in (out_dir / "hac" / "_cache").iterdir() if d.is_dir()]
+    assert len(fingerprint_dirs) == 2  # one per distinct particle set, not reused

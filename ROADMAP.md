@@ -291,6 +291,32 @@ file tracks the public milestone sequence.
   actual problem), and an "All class averages" grid shows every successful job's panel
   together below the comparison figure, not just one at a time.
 
+  **Fourth round (same day), from the first real (non-fixture) dataset run**: a
+  serious project-wide caching-identity bug, surfaced the moment `stw gui` was
+  actually pointed at a real dataset (672-particle T4P, reusing the same `out_dir`
+  the tiny test fixture had used earlier in the same session) rather than only ever
+  the committed test fixture. No adapter's `job.cache_dir` was ever keyed by *which
+  particle set* built its cached prep — EMAN2/PyTom/RELION/PEET use it directly as
+  their entire prep directory (no mask-awareness even), ProTomo/Dynamo/DISCA/STOPGAP
+  sub-key it only by mask. Reusing `out_dir` across datasets therefore silently
+  reused the first dataset's prep for the second, everywhere except PyTom, which
+  failed loudly (`class(es) with zero particles`) because its cached particle-list
+  XML referenced the first dataset's filenames under the second dataset's particle
+  directory. Fixed once, at the root: `ParticleSet.fingerprint()` folds into
+  `cache_dir`/`cache_root` in `orchestrator.run_config()` (and `stw mask`'s
+  standalone cache) — no adapter needed to change, and every one of their own
+  existing mask/wedge-based sub-keys still works exactly as before, just now nested
+  one level under a per-dataset directory. A second, related GUI-only bug from the
+  same test: the class-average panel endpoint disk-cached its rendered PNG keyed
+  only by `out_dir/package/k/seed`, with no invalidation, so it kept serving the
+  *first* dataset's stale image even after the fix above corrected the underlying
+  MRCs — panels are no longer disk-cached at all, just rendered fresh in memory on
+  every request (cheap enough that caching was never actually buying anything).
+  This is the kind of bug class the tiny fixture alone could never have surfaced
+  (every prior adapter test used a fresh `tmp_path` per test) — a reminder that
+  fixture-only testing has a real blind spot around exactly this kind of
+  cross-run/cross-dataset state.
+
 ## Package install tiers
 
 | Tier | Meaning | Packages |

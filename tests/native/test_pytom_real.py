@@ -82,5 +82,5 @@ def test_pytom_wedge_config_change_produces_distinct_cached_particle_list(tiny_f
     run_config(RunConfig.model_validate({**base_cfg, "wedge": {"kind": "uniform", "tilt_min": -70, "tilt_max": 70}}))
 
     cache_dir = out_dir / "pytom" / "_cache"
-    plists = sorted(p.name for p in cache_dir.glob("particle_list_w*.xml"))
+    plists = sorted(p.name for p in cache_dir.rglob("particle_list_w*.xml"))
     assert plists == ["particle_list_w20.xml", "particle_list_w40.xml"]

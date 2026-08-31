@@ -48,7 +48,7 @@ you're keeping before spending time on a full run:
 
 ```console
 wrote preview.mrc
-QC overlay: .stw_mask_cache/mask_<hash>.overlay.png
+QC overlay: .stw_mask_cache/<particle-set fingerprint>/mask_<hash>.overlay.png
 ```
 
 Try a few radii/kinds this way and look at the overlay each time; there's no
@@ -64,7 +64,12 @@ a fresh file rather than silently reusing a stale one (a real caching bug
 class found and fixed multiple times across individual adapters early on;
 see `docs/limitations.md`'s "Native package installs are genuinely fragile"
 section). A QC overlay is written alongside the cached mask automatically
-too, in `<out_dir>/_cache/mask_<hash>.overlay.png`.
+too, in `<out_dir>/_cache/<particle-set fingerprint>/mask_<hash>.overlay.png`.
+The particle-set fingerprint subdirectory matters just as much as the mask's
+own hash: reusing the same `out_dir` for a *different* particle set (e.g.
+switching from a test fixture to a real dataset without changing `out_dir`)
+must not reuse a mask MRC built for the old dataset's box size — see
+`docs/limitations.md`'s note on this exact bug.
 
 ## Mask-related pitfalls worth knowing about
 

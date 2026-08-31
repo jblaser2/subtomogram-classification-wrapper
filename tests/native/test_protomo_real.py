@@ -17,7 +17,6 @@ build/mask-convert/subvolinitial.sh/subvolsvd.sh are all skipped; only
 `cycle-000/param.sh`'s rewrite + subvolhac.sh/tomoinfo re-run).
 """
 import csv
-import os
 
 import pytest
 
@@ -96,12 +95,12 @@ def test_protomo_prep_is_cached_across_k(tiny_fixture_dir, tmp_path):
     }
     run_config(RunConfig.model_validate({**base, "k": 2}))
     cache_root = out_dir / "protomo" / "_cache"
-    prep_dirs = [d for d in os.listdir(cache_root) if d.startswith("prep_")]
+    prep_dirs = list(cache_root.glob("*/prep_*"))
     assert len(prep_dirs) == 1
-    coo_before = (cache_root / prep_dirs[0] / "process" / "cycle-000" / "stw-000.coo").stat().st_mtime
+    coo_before = (prep_dirs[0] / "process" / "cycle-000" / "stw-000.coo").stat().st_mtime
 
     run_config(RunConfig.model_validate({**base, "k": 3}))  # different k, same mask
-    coo_after = (cache_root / prep_dirs[0] / "process" / "cycle-000" / "stw-000.coo").stat().st_mtime
+    coo_after = (prep_dirs[0] / "process" / "cycle-000" / "stw-000.coo").stat().st_mtime
     assert coo_after == coo_before  # svd was not recomputed for the new k
 
 
@@ -115,5 +114,5 @@ def test_protomo_distinct_masks_build_distinct_prep_dirs(tiny_fixture_dir, tmp_p
     run_config(RunConfig.model_validate({**base, "mask": {"kind": "sphere", "radius": 9}}))
     run_config(RunConfig.model_validate({**base, "mask": {"kind": "sphere", "radius": 6}}))
     cache_root = out_dir / "protomo" / "_cache"
-    prep_dirs = [d for d in os.listdir(cache_root) if d.startswith("prep_")]
+    prep_dirs = list(cache_root.glob("*/prep_*"))
     assert len(prep_dirs) == 2

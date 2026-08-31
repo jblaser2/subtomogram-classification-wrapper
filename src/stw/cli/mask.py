@@ -24,7 +24,10 @@ def build_mask(
 
     from stw.masks.resolve import resolve_mask
 
-    mask_path = resolve_mask(spec, ps, out.parent / ".stw_mask_cache")
+    # ps.fingerprint(): the same out.parent/.stw_mask_cache dir could otherwise be reused
+    # across two different `stw mask` calls for different datasets (same reasoning as
+    # orchestrator.run_config()'s cache_dir/cache_root).
+    mask_path = resolve_mask(spec, ps, out.parent / ".stw_mask_cache" / ps.fingerprint())
     if mask_path is None:
         typer.echo("mask kind=none — nothing to write")
         raise typer.Exit(code=0)

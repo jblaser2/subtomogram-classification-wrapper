@@ -78,5 +78,5 @@ def test_relion_wedge_config_change_produces_distinct_cached_files(tiny_fixture_
     run_config(RunConfig.model_validate({**base_cfg}))  # no wedge -> full coverage
 
     cache_dir = out_dir / "relion" / "_cache"
-    ctf_files = sorted(p.name for p in cache_dir.glob("ctf_t*.mrc"))
+    ctf_files = sorted(p.name for p in cache_dir.rglob("ctf_t*.mrc"))
     assert ctf_files == ["ctf_t50.mrc", "ctf_t90.mrc"]

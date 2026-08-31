@@ -28,7 +28,6 @@ changes the clustering) without overclaiming a clean recovery this fixture
 doesn't support.
 """
 import csv
-import os
 
 import pytest
 
@@ -130,9 +129,9 @@ def test_stopgap_embedding_is_cached_across_k(tiny_fixture_dir, tmp_path):
     }
     run_config(RunConfig.model_validate({**base, "k": 2}))
     cache_root = out_dir / "stopgap" / "_cache"
-    embed_dirs = [d for d in os.listdir(cache_root) if d.startswith("embed_")]
+    embed_dirs = list(cache_root.glob("*/embed_*"))
     assert len(embed_dirs) == 1
-    eig = cache_root / embed_dirs[0] / "pca" / "eigenval_1.csv"
+    eig = embed_dirs[0] / "pca" / "eigenval_1.csv"
     mtime_before = eig.stat().st_mtime
 
     run_config(RunConfig.model_validate({**base, "k": 3}))
@@ -149,7 +148,7 @@ def test_stopgap_distinct_masks_build_distinct_embed_dirs(tiny_fixture_dir, tmp_
     run_config(RunConfig.model_validate({**base, "mask": {"kind": "sphere", "radius": 9}}))
     run_config(RunConfig.model_validate({**base, "mask": {"kind": "sphere", "radius": 11}}))
     cache_root = out_dir / "stopgap" / "_cache"
-    embed_dirs = [d for d in os.listdir(cache_root) if d.startswith("embed_")]
+    embed_dirs = list(cache_root.glob("*/embed_*"))
     assert len(embed_dirs) == 2
 
 
@@ -168,7 +167,7 @@ def test_stopgap_uniform_wedge_writes_requested_tilt_range(tiny_fixture_dir, tmp
     report = run_config(cfg)
     assert report.results[0]["status"] == "ok"
     cache_root = out_dir / "stopgap" / "_cache"
-    embed_dir = next(d for d in cache_root.iterdir() if d.name.startswith("embed_"))
+    embed_dir = next(cache_root.glob("*/embed_*"))
     wedgelist = (embed_dir / "lists" / "wedgelist.star").read_text()
     # sg_wedgelist_write writes tilt_angle as a plain integer, e.g. " -50 " / " 49 "
     # (min:step:max in 3-degree steps from -50 never lands exactly on +50).

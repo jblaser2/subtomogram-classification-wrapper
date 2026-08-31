@@ -113,8 +113,6 @@ def test_dynamo_k3_is_non_degenerate(tiny_fixture_dir, tmp_path):
 def test_dynamo_embedding_is_cached_across_k(tiny_fixture_dir, tmp_path):
     """The MATLAB embedding (prealign/ccmatrix/eigentable/eigenvolumes) is
     independent of k -- only k-means (cheap, Python) should rerun."""
-    import os
-
     _skip_if_not_installed()
     out_dir = tmp_path / "out"
     base = {
@@ -124,9 +122,11 @@ def test_dynamo_embedding_is_cached_across_k(tiny_fixture_dir, tmp_path):
     }
     run_config(RunConfig.model_validate({**base, "k": 2}))
     cache_root = out_dir / "dynamo" / "_cache"
-    embed_dirs = [d for d in os.listdir(cache_root) if d.startswith("embed_")]
+    # cache_root/<particle-set fingerprint>/embed_<mask hash> since the orchestrator's
+    # particle-set-identity fix; glob one level deeper rather than os.listdir directly.
+    embed_dirs = list(cache_root.glob("*/embed_*"))
     assert len(embed_dirs) == 1
-    ecsv = cache_root / embed_dirs[0] / "eigencomponents.csv"
+    ecsv = embed_dirs[0] / "eigencomponents.csv"
     mtime_before = ecsv.stat().st_mtime
 
     run_config(RunConfig.model_validate({**base, "k": 3}))
@@ -135,8 +135,6 @@ def test_dynamo_embedding_is_cached_across_k(tiny_fixture_dir, tmp_path):
 
 def test_dynamo_distinct_masks_build_distinct_embed_dirs(tiny_fixture_dir, tmp_path):
     _skip_if_not_installed()
-    import os
-
     out_dir = tmp_path / "out"
     base = {
         "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "k": 2,
@@ -146,5 +144,5 @@ def test_dynamo_distinct_masks_build_distinct_embed_dirs(tiny_fixture_dir, tmp_p
     run_config(RunConfig.model_validate({**base, "mask": {"kind": "sphere", "radius": 9}}))
     run_config(RunConfig.model_validate({**base, "mask": {"kind": "sphere", "radius": 6}}))
     cache_root = out_dir / "dynamo" / "_cache"
-    embed_dirs = [d for d in os.listdir(cache_root) if d.startswith("embed_")]
+    embed_dirs = list(cache_root.glob("*/embed_*"))
     assert len(embed_dirs) == 2

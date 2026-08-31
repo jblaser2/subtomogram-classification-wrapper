@@ -85,7 +85,14 @@ def run_config(config: RunConfig, *, progress: ProgressSink | None = None, dry_r
     # in a nonexistent nested location (found via the GUI's relative "./stw_out" default,
     # but a bug in this shared code path, affecting the CLI equally for a relative out_dir).
     out_dir = Path(config.out_dir).resolve()
-    cache_root = out_dir / "_cache"
+    # fingerprint(): reusing the same out_dir for two different particle sets (e.g. a
+    # test fixture, then a real dataset) must NOT reuse cached prep built from the
+    # other one -- no adapter's own internal caching accounts for particle-set
+    # identity on its own (several key only on the mask, e.g. a same-radius sphere
+    # mask on two different box sizes would otherwise collide too), so this is keyed
+    # in once, at the root, for every package + the shared mask cache alike.
+    particles_key = particles.fingerprint()
+    cache_root = out_dir / "_cache" / particles_key
     mask_path = None if dry_run else resolve_mask(mask_spec, particles, cache_root)
 
     preflight: list[PackageReport] = []
@@ -120,7 +127,7 @@ def run_config(config: RunConfig, *, progress: ProgressSink | None = None, dry_r
                     continue
 
                 workdir = out_dir / package / f"k{k}" / f"seed{seed:02d}"
-                cache_dir = out_dir / package / "_cache"
+                cache_dir = out_dir / package / "_cache" / particles_key
                 job = Job(
                     package=adapter_cls.name, particles=particles, mask_path=mask_path, mask_spec=mask_spec,
                     wedge=wedge_spec, alignment_state=config.alignment_state, k=k, seed=seed,

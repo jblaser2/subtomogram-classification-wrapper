@@ -230,3 +230,28 @@ All notable changes to this project are documented here.
   they actually control — `docs/mask-design.md` and `stw gui`'s own field labels now
   say explicitly that `axis` is the long/extrusion axis and `radius` is perpendicular
   to it, independent of `half_height`.
+- **A real, serious caching-identity bug, found via the GUI on a real dataset**: no
+  adapter's `job.cache_dir` (EMAN2/PyTom/RELION/PEET use it directly as their whole
+  prep dir; ProTomo/Dynamo/DISCA/STOPGAP sub-key it only by mask) ever accounted for
+  *which particle set* built its cached prep. Reusing the same `out_dir` for two
+  different datasets (e.g. `stw gui`'s form keeping its default `out_dir` across
+  runs, as most users would naturally do switching from a quick test to a real
+  dataset) silently reused the first dataset's cached prep for the second — loudly
+  for PyTom (a hard `class(es) with zero particles` failure, since its cached
+  particle-list XML referenced the first dataset's filenames, none of which exist
+  under the second dataset's particle directory) and possibly *silently* for every
+  other adapter, which have no equivalent existence check. Fixed at the root:
+  `ParticleSet.fingerprint()` (a hash of particle directory/pattern/file list/box/
+  pixel size) is now folded into `cache_dir`/`cache_root` in
+  `orchestrator.run_config()` (and `stw mask`'s own standalone cache), so every
+  distinct dataset automatically gets its own cache subdirectory — no adapter needed
+  to change. **If you ran more than one dataset through the same `out_dir` before
+  this fix, results from every adapter except PyTom (which failed loudly) should be
+  treated as unverified and re-run.**
+- A related GUI-only bug: the class-average panel endpoint cached its rendered PNG
+  on disk keyed only by `out_dir/package/k/seed`, with no invalidation — reusing the
+  same `out_dir` for a second dataset kept serving the *first* dataset's stale
+  rendered image even after the fix above made the underlying class-average MRCs
+  themselves correct. Panels are no longer disk-cached at all; `render_class_average_panel`
+  now returns PNG bytes directly (rendering is cheap enough that there's no reason to
+  cache it).

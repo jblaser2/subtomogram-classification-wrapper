@@ -29,12 +29,17 @@ different, much slower problem, and each package's own aligner works
 differently — supporting it properly is a separate, later effort (a planned
 `stw align` subcommand), not something bolted onto the classification wrapper.
 
-- `alignment_state: rough` is accepted with a warning. It changes real
-  behavior today (an `auto` mask centers on the density's center of mass
-  instead of assuming the box center, to avoid clipping poorly-centered
-  signal), but no package here actually re-aligns rough input.
-- `alignment_state: unaligned` is a hard, immediate preflight error, not a
-  silently wrong result.
+- `alignment_state: rough` is accepted with a warning only — **no package here
+  actually re-aligns rough input, and nothing else about the run changes
+  either.** `masks/auto.py`'s `auto_sphere_mask()` has a center-of-mass
+  centering mode (`center_mode="com"`) intended for exactly this case (poorly
+  centered input, where a box-centered mask risks clipping real signal), but
+  it's implemented and not yet wired to `alignment_state` — `resolve_mask()`
+  always calls it with the box-centered default regardless. So today, `rough`
+  is functionally identical to `fine`, just without the (currently false)
+  guarantee that particles are well-centered.
+- `alignment_state: unaligned` is a hard, immediate preflight error — the
+  package is skipped (`status: incompatible`), not run at all.
 
 ## Missing wedge / tilt information
 

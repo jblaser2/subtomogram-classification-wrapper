@@ -158,7 +158,7 @@ def _execute(run_id: str, cfg: RunConfig) -> None:
 
 
 def create_app():
-    from fastapi import FastAPI, HTTPException
+    from fastapi import FastAPI, HTTPException, Response
     from fastapi.responses import FileResponse, StreamingResponse
     from fastapi.staticfiles import StaticFiles
 
@@ -286,14 +286,13 @@ def create_app():
         )
         if result is None or not result.get("class_averages"):
             raise HTTPException(status_code=404, detail="no class averages for this job")
-        out_png = Path(state.out_dir) / package / f"k{k}" / f"seed{seed:02d}" / "class_average_panel.png"
-        if not out_png.exists():
-            from stw.gui.render import render_class_average_panel
-            render_class_average_panel(
-                result["class_averages"], result["n_per_class"], out_png,
-                title=f"{package} k={k} seed={seed}",
-            )
-        return FileResponse(out_png)
+        from stw.gui.render import render_class_average_panel
+        # Always rendered fresh, never disk-cached by path -- see render.py's module
+        # docstring for the real staleness bug this used to have.
+        png_bytes = render_class_average_panel(
+            result["class_averages"], result["n_per_class"], title=f"{package} k={k} seed={seed}",
+        )
+        return Response(content=png_bytes, media_type="image/png")
 
     static_dir = Path(__file__).resolve().parent / "static"
     app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")

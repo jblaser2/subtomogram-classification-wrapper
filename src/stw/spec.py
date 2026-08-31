@@ -154,6 +154,17 @@ class ParticleSet:
     def path_for(self, filename: str) -> Path:
         return self.particle_dir / filename
 
+    def fingerprint(self) -> str:
+        """Identifies this exact particle set (directory + pattern + file list +
+        box + pixel size) for cache-directory keying. Every adapter's `job.cache_dir`
+        is rooted under this (see orchestrator.run_config()) -- without it, reusing
+        the same out_dir for two different datasets would silently (or, for
+        adapters with a hard particle-existence check, loudly) reuse the wrong
+        dataset's cached prep, since no adapter's own internal caching previously
+        accounted for particle-set identity at all (several key only on the mask)."""
+        payload = f"{self.particle_dir}|{self.pattern}|{self.box}|{self.pixel_size}|{','.join(self.files)}"
+        return hashlib.sha1(payload.encode()).hexdigest()[:12]
+
 
 @dataclass(frozen=True)
 class Job:

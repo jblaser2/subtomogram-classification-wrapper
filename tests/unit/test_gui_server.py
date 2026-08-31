@@ -123,10 +123,10 @@ def test_panel_titles_show_real_particle_counts_not_question_marks(client, tiny_
 
     original = render_module.render_class_average_panel
 
-    def spy(class_averages, n_per_class, out_png, title):
+    def spy(class_averages, n_per_class, title):
         captured["class_averages"] = class_averages
         captured["n_per_class"] = n_per_class
-        return original(class_averages, n_per_class, out_png, title)
+        return original(class_averages, n_per_class, title)
 
     monkeypatch.setattr(render_module, "render_class_average_panel", spy)
 
@@ -146,6 +146,53 @@ def test_panel_titles_show_real_particle_counts_not_question_marks(client, tiny_
     assert res.status_code == 200
     assert set(captured["class_averages"].keys()) == set(captured["n_per_class"].keys())
     assert all(captured["n_per_class"][k] > 0 for k in captured["n_per_class"])
+
+
+def test_panel_reflects_current_run_not_a_stale_disk_cache(client, tiny_fixture_dir, tmp_path):
+    """Regression test for a real bug found via the GUI: the class-average panel
+    endpoint used to cache its rendered PNG on disk at a path keyed only by
+    out_dir/package/k/seed -- reusing the same out_dir for a second, different
+    dataset (e.g. switching from a test fixture to a real one without changing
+    out_dir) served the FIRST dataset's stale rendered image even though the
+    underlying class-average MRCs had correctly been overwritten with the new
+    dataset's own averages. Panels are no longer disk-cached at all (see
+    stw.gui.render's module docstring) -- this proves it end to end, not just
+    that the function signature changed."""
+    import mrcfile
+    import numpy as np
+
+    out_dir = tmp_path / "out"  # SAME out_dir reused for both runs, on purpose
+
+    body1 = {
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "pixel_size": 5.0,
+        "k": 2, "seeds": 1, "mask": {"kind": "sphere", "radius": 9.0},
+        "packages": ["hac"], "out_dir": str(out_dir),
+    }
+    res1 = client.post("/api/runs", json=body1)
+    run_id1 = res1.json()["run_id"]
+    with client.stream("GET", f"/api/runs/{run_id1}/events") as resp:
+        for line in resp.iter_lines():
+            if line.startswith("data: ") and '"run_complete"' in line:
+                break
+    panel1 = client.get(f"/api/runs/{run_id1}/panel/hac/2/1").content
+
+    other_dir = tmp_path / "other_particles"
+    other_dir.mkdir()
+    rng = np.random.default_rng(1)
+    for i in range(8):
+        with mrcfile.new(other_dir / f"p_{i:02d}.mrc", overwrite=True) as m:
+            m.set_data(rng.normal(size=(24, 24, 24)).astype("float32"))
+            m.voxel_size = 5.0
+    body2 = {**body1, "particles": str(other_dir), "pattern": "*.mrc"}
+    res2 = client.post("/api/runs", json=body2)
+    run_id2 = res2.json()["run_id"]
+    with client.stream("GET", f"/api/runs/{run_id2}/events") as resp:
+        for line in resp.iter_lines():
+            if line.startswith("data: ") and '"run_complete"' in line:
+                break
+    panel2 = client.get(f"/api/runs/{run_id2}/panel/hac/2/1").content
+
+    assert panel1 != panel2  # must reflect the second run's own data, not the first's
 
 
 def test_preview_dataset_returns_specs_and_png(client, tiny_fixture_dir):

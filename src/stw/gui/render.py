@@ -1,19 +1,28 @@
 """On-demand PNG rendering for the GUI: class-average MRCs aren't browser-
 displayable, so each result's `class_averages` dict is rendered to one panel
 PNG per request (cheap — a handful of small central-slice images). Requires
-the `viz` extra (matplotlib); the `gui` extra already pulls it in."""
+the `viz` extra (matplotlib); the `gui` extra already pulls it in.
+
+Nothing here writes to disk or caches by path -- a disk-cached
+`class_average_panel.png` keyed only by `out_dir/package/k/seed` was a real
+bug found via the GUI: `workdir` (unlike `cache_dir`) is not particle-set
+fingerprinted (its own MRC files always get overwritten fresh by the
+adapter every run, so it never needed to be), but a "if the PNG already
+exists, don't re-render" cache sitting on top of that path had no way to
+know the underlying MRCs had changed underneath it -- reusing the same
+out_dir for a different dataset kept serving the OLD dataset's rendered
+panel image, even though the new dataset's own class-average MRCs were
+correctly regenerated on disk. Rendering is cheap enough (a handful of small
+central-slice images) that there is no reason to cache it at all."""
 from __future__ import annotations
 
 import io
-from pathlib import Path
 
 import mrcfile
 import numpy as np
 
 
-def render_class_average_panel(
-    class_averages: dict[str, str], n_per_class: dict[str, int], out_png: str | Path, title: str
-) -> None:
+def render_class_average_panel(class_averages: dict[str, str], n_per_class: dict[str, int], title: str) -> bytes:
     import matplotlib
 
     matplotlib.use("Agg")
@@ -31,9 +40,10 @@ def render_class_average_panel(
         ax.axis("off")
     fig.suptitle(title, fontsize=11)
     fig.tight_layout()
-    Path(out_png).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(str(out_png), dpi=130, bbox_inches="tight")
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
     plt.close(fig)
+    return buf.getvalue()
 
 
 def render_volume_slice_png(vol: np.ndarray, title: str) -> bytes:
