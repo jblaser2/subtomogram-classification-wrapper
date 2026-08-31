@@ -28,6 +28,17 @@ stw gui --host 0.0.0.0       # bind beyond localhost (LAN-reachable — see note
 
 ## What it does
 
+0. **Align first (optional)** — a collapsible section above the main particle
+   directory field, for roughly-aligned input specifically (see
+   [`docs/align.md`](align.md) — a real global search, PyTom's FRM, not a
+   from-scratch aligner, and it needs its own compiled extension most PyTom
+   installs don't have; the section shows what's missing if it's
+   unavailable). Uses its **own** mask fields, deliberately separate from the
+   classification mask below — reusing one mask for both has actually
+   destroyed classification signal before, see `docs/align.md`. On success,
+   shows a live preview of the aligned average and a "Use this aligned
+   output →" button that fills the main particle directory/pattern/pixel
+   size fields for you.
 1. **Particles / mask / wedge / classification** — a form covering
    `RunConfig`'s core fields (particle directory, pattern, pixel size,
    alignment state, mask kind + params, wedge kind + tilt range, `k`, seeds,

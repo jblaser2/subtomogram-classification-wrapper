@@ -30,3 +30,36 @@ arbitrary MRC mask into PyTom's `.em` format via `pytom.lib.pytom_volume`.
 `-a` (noalign) is mandatory here: this machine's PyTom build has no compiled
 `_swig_frm` extension, so its alignment search is unavailable regardless —
 matching `stw`'s own pre-aligned-input-only stance anyway.
+
+## `stw align` (FRM alignment) scripts
+
+Three more files here drive PyTom's *own* FRM (Fast Rotational Matching)
+alignment — `stw`'s `align` feature, not the classification adapter above.
+Requires `scripts/compile_pytom_frm.sh` to have been run once (see
+`docs/install/pytom.md`'s FRM section); the classification adapter never
+needs this, since it always runs `-a`/noalign.
+
+- `build_frm_job.py` — builds a real `FRMJob` XML (PyTom's own
+  `Reference`/`Mask`/`SampleInformation`/`FRMJob.toXMLFile()`), never
+  hand-rolled XML.
+- `frm_align_runner.py` — runs PyTom's own real `pytom/bin/FRMAlignment.py`
+  under `mpirun`. A real, separate cross-version break from the one above:
+  `FRMAlignment.py` still does `import pytom_mpi` and (inside
+  `retrieve_res_vols`/`create_average`) `from pytom_volume import ...` —
+  pre-refactor flat module names only resolvable today via
+  `pytom.lib.pytom_mpi`/`pytom.lib.pytom_volume`/`pytom.lib.pytom_numpy`/
+  `pytom.lib.pytom_fftplan`/`pytom.lib.pytom_freqweight`. This wrapper
+  aliases all five into `sys.modules` before running `FRMAlignment`'s own
+  `__main__` via `runpy`, rather than patching PyTom's own source.
+- `apply_frm_poses.py` — `FRMAlignment.py` itself only ever *averages* the
+  aligned stack; it never writes individual aligned particles back out. This
+  reads the final `aligned_pl_iterN.xml` and writes each particle's own real
+  `getTransformedVolume()` (PyTom's cubic-spline pose application via
+  `transformSpline` — never reimplemented) as a new MRC, plus a CSV of the
+  recovered per-particle poses/scores for provenance.
+
+Verified end-to-end on a real, deliberately roughly-misaligned copy of the
+tiny test fixture (small random rotation + shift applied per particle):
+FRM alignment ran 4 real iterations with real FSC-based resolution
+tracking, and the realigned average's sharpness (voxel std) recovered from
+0.136 (rough) to 0.165 — close to the truly-pre-aligned fixture's own 0.168.

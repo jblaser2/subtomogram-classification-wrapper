@@ -11,8 +11,11 @@ each package's own CLI, file formats, and quirks one at a time.
 > `stw list`. PyTom and RELION both have a genuinely working missing-wedge pass-through. DISCA
 > is real but genuinely slow (hours/seed at real dataset scale) — never include it in a
 > default/`--all` package set. A local web GUI (`stw gui`, needs the `gui` extra) is also
-> up — see [`docs/gui.md`](docs/gui.md). See [`ROADMAP.md`](ROADMAP.md) for the full plan
-> and [`docs/limitations.md`](docs/limitations.md) for what this tool does and doesn't do yet.
+> up — see [`docs/gui.md`](docs/gui.md). `stw align` (needs a compiled PyTom extension —
+> `scripts/compile_pytom_frm.sh`) does real global fine-alignment for roughly-aligned
+> input — see [`docs/align.md`](docs/align.md). See [`ROADMAP.md`](ROADMAP.md) for the
+> full plan and [`docs/limitations.md`](docs/limitations.md) for what this tool does and
+> doesn't do yet.
 
 ## Why
 

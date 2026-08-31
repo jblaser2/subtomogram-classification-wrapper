@@ -285,6 +285,29 @@ def test_packages_expose_algorithm_summary(client):
     assert packages["pytom-preview"]["capabilities"]["k_range"] == [2, 2]
 
 
+def test_align_check_endpoint_returns_availability_shape(client):
+    """CI-safe regardless of whether this machine actually has PyTom's FRM
+    extension compiled -- just checks the endpoint never crashes and reports
+    a well-formed availability check."""
+    res = client.get("/api/align/check")
+    assert res.status_code == 200
+    d = res.json()
+    assert isinstance(d["available"], bool)
+    assert {c["kind"] for c in d["checks"]} == {"conda_env", "conda_python_import"}
+
+
+def test_start_align_rejects_invalid_config(client, tmp_path):
+    res = client.post("/api/align", json={"particles": str(tmp_path), "mask": {"kind": "none"}})
+    assert res.status_code == 422
+    assert "requires a mask" in res.json()["detail"]
+
+
+def test_unknown_align_id_404s(client):
+    assert client.get("/api/align/does-not-exist/report").status_code == 404
+    assert client.get("/api/align/does-not-exist/events").status_code == 404
+    assert client.get("/api/align/does-not-exist/preview").status_code == 404
+
+
 def test_comparison_png_404s_with_only_one_successful_package(client, tiny_fixture_dir, tmp_path):
     """build_comparison needs >=2 successful results (same rule the orchestrator
     itself enforces) -- a single-package run has no comparison figure at all."""

@@ -13,6 +13,54 @@
 
 <main>
   <section class="panel" id="config-panel">
+    <h2>0. Align first (optional)
+      <button type="button" id="align-toggle" class="collapse-toggle">show</button>
+    </h2>
+    <div id="align-section" class="hidden">
+      <p class="muted" style="margin: 0 0 10px;">
+        Roughly-aligned input only — a real global search (PyTom's FRM), not a
+        from-scratch aligner. Use a <strong>different, broader mask here than
+        you plan to classify with</strong> — reusing the classification mask for
+        alignment has actually destroyed the classification signal before (see
+        <a href="https://github.com/jblaser2/subtomogram-classification-wrapper/blob/main/docs/align.md" target="_blank" rel="noopener">docs/align.md</a>).
+      </p>
+      <div id="align-unavailable" class="error hidden"></div>
+      <label>Particle directory (roughly aligned)
+        <input type="text" id="f-align-particles" placeholder="/path/to/rough_particles">
+      </label>
+      <div class="row">
+        <label>Filename pattern
+          <input type="text" id="f-align-pattern" value="*.mrc">
+        </label>
+        <label>Pixel size (Å, optional)
+          <input type="number" step="any" id="f-align-pixel-size" placeholder="from header">
+        </label>
+      </div>
+      <label>Alignment mask kind
+        <select id="f-align-mask-kind">
+          <option value="auto" selected>auto (blind density envelope)</option>
+          <option value="sphere">sphere</option>
+          <option value="file">file</option>
+        </select>
+      </label>
+      <div class="row hidden" id="align-mask-sphere-fields">
+        <label>Radius (voxels)
+          <input type="number" step="any" id="f-align-mask-radius">
+        </label>
+      </div>
+      <div class="row hidden" id="align-mask-file-fields">
+        <label>Mask MRC path
+          <input type="text" id="f-align-mask-path">
+        </label>
+      </div>
+      <label>Output directory
+        <input type="text" id="f-align-out-dir" value="./stw_align_out">
+      </label>
+      <button id="align-btn" type="button" class="secondary-btn">Align</button>
+      <div id="align-progress" class="muted"></div>
+      <div id="align-result" class="preview-slot"></div>
+    </div>
+
     <h2>1. Particles</h2>
     <label>Particle directory
       <input type="text" id="f-particles" placeholder="/path/to/particles">

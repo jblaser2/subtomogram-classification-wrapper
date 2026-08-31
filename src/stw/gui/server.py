@@ -28,6 +28,8 @@ from typing import Any
 import numpy as np
 
 from stw.adapters import registry
+from stw.align import AlignConfig, run_pytom_alignment
+from stw.align import check_installed as check_align_installed
 from stw.averaging import global_average
 from stw.capabilities import Capabilities
 from stw.config import RunConfig
@@ -69,6 +71,18 @@ class RunState:
 
 
 RUNS: dict[str, RunState] = {}
+
+
+@dataclass
+class AlignState:
+    align_id: str
+    status: str = "running"  # running | done | error
+    error: str | None = None
+    report: dict | None = None
+    events: queue.Queue = field(default_factory=queue.Queue)
+
+
+ALIGNS: dict[str, AlignState] = {}
 
 
 def _caps_to_dict(caps: Capabilities) -> dict:
@@ -140,6 +154,21 @@ def _build_preview_mask(mask_body: dict[str, Any], particles: ParticleSet) -> np
             )
         return mask
     raise HTTPException(status_code=422, detail="mask kind=none has no mask to preview")
+
+
+def _execute_align(align_id: str, cfg: AlignConfig) -> None:
+    state = ALIGNS[align_id]
+    sink = QueueProgressSink(state.events)
+    try:
+        report = run_pytom_alignment(cfg, progress=sink)
+        state.report = report.to_dict()
+        state.status = "done" if report.status == "ok" else "error"
+        state.error = report.error
+    except Exception as e:  # noqa: BLE001 - surfaced to the UI, not swallowed
+        state.status = "error"
+        state.error = str(e)
+    finally:
+        state.events.put(None)
 
 
 def _execute(run_id: str, cfg: RunConfig) -> None:
@@ -218,6 +247,86 @@ def create_app():
             "n_particles": len(particles.files),
             "box": particles.box,
             "pixel_size": particles.pixel_size,
+            "preview_png_base64": base64.b64encode(png_bytes).decode("ascii"),
+        }
+
+    @app.get("/api/align/check")
+    def align_check() -> dict:
+        """Whether `stw align` (PyTom's compiled FRM extension) is actually
+        available on this machine -- separate from classification's own PyTom
+        check, since FRM needs scripts/compile_pytom_frm.sh, which most PyTom
+        installs never run."""
+        checks = check_align_installed()
+        return {
+            "available": all(c.ok for c in checks),
+            "checks": [
+                {"kind": str(c.requirement.kind), "name": c.requirement.name, "ok": c.ok,
+                 "message": c.message, "install_hint": c.requirement.install_hint}
+                for c in checks
+            ],
+        }
+
+    @app.post("/api/align")
+    def start_align(body: dict[str, Any]) -> dict:
+        try:
+            cfg = AlignConfig.model_validate(body)
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+        align_id = uuid.uuid4().hex[:12]
+        ALIGNS[align_id] = AlignState(align_id=align_id)
+        thread = threading.Thread(target=_execute_align, args=(align_id, cfg), daemon=True)
+        thread.start()
+        return {"align_id": align_id}
+
+    @app.get("/api/align/{align_id}/events")
+    def align_events(align_id: str):
+        state = ALIGNS.get(align_id)
+        if state is None:
+            raise HTTPException(status_code=404, detail="unknown align_id")
+
+        def gen():
+            while True:
+                item = state.events.get()
+                if item is None:
+                    final = {
+                        "event": "run_complete", "package": "_align",
+                        "payload": {"status": state.status, "error": state.error},
+                    }
+                    yield f"data: {json.dumps(final)}\n\n"
+                    break
+                yield f"data: {json.dumps(item)}\n\n"
+
+        return StreamingResponse(gen(), media_type="text/event-stream")
+
+    @app.get("/api/align/{align_id}/report")
+    def align_report(align_id: str) -> dict:
+        state = ALIGNS.get(align_id)
+        if state is None:
+            raise HTTPException(status_code=404, detail="unknown align_id")
+        if state.status == "running":
+            raise HTTPException(status_code=409, detail="alignment still in progress")
+        if state.status == "error":
+            raise HTTPException(status_code=500, detail=state.error)
+        return state.report
+
+    @app.get("/api/align/{align_id}/preview")
+    def align_preview(align_id: str) -> dict:
+        """Central-slice global average of the ALIGNED output, same rendering
+        as /api/preview -- lets the GUI show a result immediately without the
+        user re-pasting the output path into the dataset preview."""
+        import base64
+
+        from stw.gui.render import render_volume_slice_png
+
+        state = ALIGNS.get(align_id)
+        if state is None or state.report is None or state.report.get("status") != "ok":
+            raise HTTPException(status_code=404, detail="no completed alignment for this align_id")
+        aligned_dir = state.report["aligned_particle_dir"]
+        particles = ParticleSet.discover(aligned_dir, "*.mrc")
+        avg = global_average(particles.particle_dir, list(particles.files))
+        png_bytes = render_volume_slice_png(avg, title=f"aligned average, n={len(particles.files)}")
+        return {
+            "n_particles": len(particles.files),
             "preview_png_base64": base64.b64encode(png_bytes).decode("ascii"),
         }
 

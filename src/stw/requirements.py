@@ -16,6 +16,7 @@ class ReqKind(str, Enum):
     EXECUTABLE = "executable"
     CONDA_ENV = "conda_env"
     PYTHON_IMPORT = "python_import"
+    CONDA_PYTHON_IMPORT = "conda_python_import"  # req.name=module, req.detail=conda env name
     ENV_VAR = "env_var"
     PATH_EXISTS = "path_exists"
     MATLAB = "matlab"
@@ -174,6 +175,27 @@ def _check_python_import(req: Requirement) -> CheckResult:
         return CheckResult(req, ok=False, found=None, message=str(e))
 
 
+def _check_conda_python_import(req: Requirement) -> CheckResult:
+    """Unlike PYTHON_IMPORT (checks stw's OWN interpreter), this checks importability
+    inside a *named conda env* (req.detail) via a subprocess -- stw never runs inside
+    a package's own env, so this is the only way to check e.g. whether PyTom's
+    compiled `_swig_frm` extension (req.name) is present without launching PyTom."""
+    import subprocess
+
+    env = req.detail or ""
+    try:
+        proc = subprocess.run(
+            ["conda", "run", "-n", env, "python3", "-c", f"import {req.name}"],
+            capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return CheckResult(req, ok=False, found=None, message=str(e))
+    if proc.returncode == 0:
+        return CheckResult(req, ok=True, found=f"{env}:{req.name}", message="importable")
+    last_line = proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else "import failed"
+    return CheckResult(req, ok=False, found=None, message=last_line)
+
+
 def _check_env_var(req: Requirement) -> CheckResult:
     import os
 
@@ -293,6 +315,7 @@ CHECKERS = {
     ReqKind.EXECUTABLE: _check_executable,
     ReqKind.CONDA_ENV: _check_conda_env,
     ReqKind.PYTHON_IMPORT: _check_python_import,
+    ReqKind.CONDA_PYTHON_IMPORT: _check_conda_python_import,
     ReqKind.ENV_VAR: _check_env_var,
     ReqKind.PATH_EXISTS: _check_path_exists,
     ReqKind.MATLAB: _check_matlab,

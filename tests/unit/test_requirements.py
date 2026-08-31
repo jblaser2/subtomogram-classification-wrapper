@@ -138,6 +138,40 @@ def test_check_mpi_ok_via_fallback_path_not_on_path(tmp_path, monkeypatch):
     assert "not on PATH" in result.message
 
 
+def test_conda_python_import_checker_ok(monkeypatch):
+    class FakeCompletedProcess:
+        returncode = 0
+        stderr = ""
+
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: FakeCompletedProcess())
+    req = Requirement(ReqKind.CONDA_PYTHON_IMPORT, "pytom.lib._swig_frm", detail="pytom_env")
+    result = CHECKERS[ReqKind.CONDA_PYTHON_IMPORT](req)
+    assert result.ok is True
+    assert result.found == "pytom_env:pytom.lib._swig_frm"
+
+
+def test_conda_python_import_checker_import_error(monkeypatch):
+    class FakeCompletedProcess:
+        returncode = 1
+        stderr = "Traceback (most recent call last):\nModuleNotFoundError: No module named 'pytom.lib._swig_frm'"
+
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: FakeCompletedProcess())
+    req = Requirement(ReqKind.CONDA_PYTHON_IMPORT, "pytom.lib._swig_frm", detail="pytom_env")
+    result = CHECKERS[ReqKind.CONDA_PYTHON_IMPORT](req)
+    assert result.ok is False
+    assert "ModuleNotFoundError" in result.message
+
+
+def test_conda_python_import_checker_conda_missing(monkeypatch):
+    def _raise(*a, **k):
+        raise OSError("conda not found")
+
+    monkeypatch.setattr("subprocess.run", _raise)
+    req = Requirement(ReqKind.CONDA_PYTHON_IMPORT, "pytom.lib._swig_frm", detail="pytom_env")
+    result = CHECKERS[ReqKind.CONDA_PYTHON_IMPORT](req)
+    assert result.ok is False
+
+
 def test_gpu_checker_absent(monkeypatch):
     monkeypatch.setattr("shutil.which", lambda name: None)
     result = CHECKERS[ReqKind.GPU](Requirement(ReqKind.GPU, "nvidia", optional=True))

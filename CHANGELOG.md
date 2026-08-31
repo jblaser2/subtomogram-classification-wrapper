@@ -154,6 +154,33 @@ All notable changes to this project are documented here.
 - **"All class averages" grid**: every successful job's class-average panel now also
   renders together in one grid below the comparison figure, not just one at a time via
   each row's own button.
+- **`stw align`** — a new alignment feature for roughly-aligned (not from-scratch
+  unaligned) input, driving PyTom's real FRM (Fast Rotational Matching): a genuine
+  global SO(3) rotational search plus joint translational refinement, run to
+  convergence via PyTom's own real gold-standard (even/odd, FSC-driven adaptive
+  lowpass) protocol under `mpirun` — never reimplements the algorithm. Chosen over two
+  alternatives after directly building and testing both: a hand-rolled NumPy aligner
+  from the source benchmark project (local-refinement-only, never validated on
+  genuinely unaligned data) and Dynamo's `dalign` (a real global search too, but every
+  real attempt at it crashed on an unresolved bug inside Dynamo's own compiled
+  table-serialization binary, data-shape-triggered). Needs a compiled `_swig_frm`
+  extension most PyTom builds don't ship with — new `scripts/compile_pytom_frm.sh`
+  clones PyTom fresh and builds it with the handful of relaxed C flags its bundled
+  1997-era spherical-harmonics source needs under a modern compiler (confirmed by
+  actually compiling and running a real alignment through it, not just reading the
+  source). New `stw align` CLI command and a collapsible "Align first" section in
+  `stw gui`, both requiring their own alignment mask, deliberately separate from the
+  classification mask — reusing one for both was tried once in the source project and
+  silently destroyed the classification signal (blind ARI 0.637 -> near-chance). Real,
+  machine-specific compatibility shim needed: PyTom's own `pytom/bin/FRMAlignment.py`
+  still does `import pytom_mpi`/`from pytom_volume import ...` (pre-refactor flat
+  module names only resolvable today via `pytom.lib.*`), worked around in a small
+  vendored runner rather than patching PyTom's own source. Verified end-to-end on a
+  real, deliberately roughly-misaligned copy of the tiny test fixture: FRM alignment
+  recovered the perturbed average's sharpness from 0.136 back to 0.165 (vs. the truly
+  pre-aligned fixture's own 0.168), the aligned output classifies cleanly through a
+  normal `stw run` with no format bridging, and a bare re-run correctly skips the
+  expensive MPI search entirely. `docs/align.md` added.
 
 ### Fixed
 - PyTom's `mpirun` call failed outright inside a container (OpenMPI's `prterun` refuses to run

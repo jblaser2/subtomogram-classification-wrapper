@@ -66,6 +66,136 @@ function wireConditionalFields() {
   };
   wedgeKind.addEventListener("change", syncWedge);
   syncWedge();
+
+  const alignMaskKind = $("f-align-mask-kind");
+  const syncAlignMask = () => {
+    const kind = alignMaskKind.value;
+    $("align-mask-sphere-fields").classList.toggle("hidden", kind !== "sphere");
+    $("align-mask-file-fields").classList.toggle("hidden", kind !== "file");
+  };
+  alignMaskKind.addEventListener("change", syncAlignMask);
+  syncAlignMask();
+}
+
+// ---------- align section ----------
+
+function setAlignCollapsed(collapsed) {
+  $("align-section").classList.toggle("hidden", collapsed);
+  $("align-toggle").textContent = collapsed ? "show" : "hide";
+}
+
+async function checkAlignAvailable() {
+  const res = await fetch("/api/align/check");
+  const d = await res.json();
+  const box = $("align-unavailable");
+  if (d.available) {
+    box.classList.add("hidden");
+    $("align-btn").disabled = false;
+    return;
+  }
+  $("align-btn").disabled = true;
+  const failed = d.checks.filter((c) => !c.ok);
+  box.classList.remove("hidden");
+  box.innerHTML = "stw align isn't available on this machine:<br>" +
+    failed.map((c) => `- ${c.name}: ${c.message}${c.install_hint ? ` (${c.install_hint})` : ""}`).join("<br>");
+}
+
+function buildAlignMaskConfig() {
+  const kind = $("f-align-mask-kind").value;
+  const mask = { kind, edge: 3.0 };
+  if (kind === "sphere") mask.radius = numOrNull("f-align-mask-radius");
+  if (kind === "file") mask.path = $("f-align-mask-path").value;
+  return mask;
+}
+
+async function startAlign() {
+  const resultBox = $("align-result");
+  const progressBox = $("align-progress");
+  resultBox.className = "preview-slot";
+  resultBox.innerHTML = "";
+  progressBox.textContent = "";
+
+  const particles = $("f-align-particles").value;
+  if (!particles) {
+    resultBox.className = "preview-slot error";
+    resultBox.textContent = "particle directory is required";
+    return;
+  }
+
+  const body = {
+    particles,
+    pattern: $("f-align-pattern").value,
+    pixel_size: numOrNull("f-align-pixel-size"),
+    mask: buildAlignMaskConfig(),
+    out_dir: $("f-align-out-dir").value,
+  };
+
+  $("align-btn").disabled = true;
+  progressBox.textContent = "Starting…";
+
+  const res = await fetch("/api/align", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({ detail: res.statusText }));
+    resultBox.className = "preview-slot error";
+    resultBox.textContent = typeof detail.detail === "string" ? detail.detail : JSON.stringify(detail.detail);
+    $("align-btn").disabled = false;
+    return;
+  }
+  const { align_id } = await res.json();
+
+  const es = new EventSource(`/api/align/${align_id}/events`);
+  es.onmessage = async (msg) => {
+    const evt = JSON.parse(msg.data);
+    if (evt.event === "run_complete") {
+      es.close();
+      $("align-btn").disabled = false;
+      await finishAlign(align_id, evt.payload);
+      return;
+    }
+    if (evt.event === "step") progressBox.textContent = evt.payload.name;
+    else if (evt.event === "substep") progressBox.textContent = evt.payload.text;
+  };
+  es.onerror = () => {
+    es.close();
+    $("align-btn").disabled = false;
+  };
+}
+
+async function finishAlign(alignId, payload) {
+  const resultBox = $("align-result");
+  const progressBox = $("align-progress");
+  if (payload.status !== "done") {
+    progressBox.textContent = "";
+    resultBox.className = "preview-slot error";
+    resultBox.textContent = payload.error || "alignment failed";
+    return;
+  }
+
+  const res = await fetch(`/api/align/${alignId}/report`);
+  const report = await res.json();
+  progressBox.textContent = `done in ${report.elapsed_sec.toFixed(1)}s`;
+
+  const previewRes = await fetch(`/api/align/${alignId}/preview`);
+  const preview = await previewRes.json();
+
+  resultBox.className = "preview-slot preview-box";
+  resultBox.innerHTML = `
+    <div class="preview-specs">${report.n_particles} particles aligned &middot; ${report.elapsed_sec.toFixed(1)}s</div>
+    <img class="panel-img" src="data:image/png;base64,${preview.preview_png_base64}">
+    ${report.warnings.map((w) => `<div class="muted" style="margin: 4px 0;">${w}</div>`).join("")}
+    <button type="button" class="link-btn" onclick="useAlignedOutput('${report.aligned_particle_dir}')">Use this aligned output &rarr;</button>
+  `;
+}
+
+function useAlignedOutput(alignedDir) {
+  $("f-particles").value = alignedDir;
+  $("f-pattern").value = $("f-align-pattern").value;
+  $("f-pixel-size").value = $("f-align-pixel-size").value;
+  $("f-particles").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 // ---------- building the config from the form ----------
@@ -413,10 +543,15 @@ function previewMask() {
 document.addEventListener("DOMContentLoaded", () => {
   wireConditionalFields();
   loadPackages();
+  checkAlignAvailable();
   $("preview-btn").addEventListener("click", previewDataset);
   $("preview-mask-btn").addEventListener("click", previewMask);
   $("run-btn").addEventListener("click", startRun);
+  $("align-btn").addEventListener("click", startAlign);
   $("progress-toggle").addEventListener("click", () => {
     setProgressCollapsed(!$("progress-list").classList.contains("hidden"));
+  });
+  $("align-toggle").addEventListener("click", () => {
+    setAlignCollapsed(!$("align-section").classList.contains("hidden"));
   });
 });

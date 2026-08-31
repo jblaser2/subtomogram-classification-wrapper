@@ -61,15 +61,27 @@ stw check-env --package pytom
 `~/conda-envs/pytom_env` or `~/miniforge3/envs/pytom_env` by default. Point
 it elsewhere with `package_options.pytom.conda_env`.
 
-## The `_swig_frm` caveat
+## The `_swig_frm` caveat (classification doesn't need it; `stw align` does)
 
-Many PyTom builds — including the one this adapter was validated against —
-don't have a compiled `_swig_frm` extension (PyTom's FRM alignment-search
-module). `stw` always passes `-a` (no-align) regardless, since it assumes
-pre-aligned input project-wide anyway (see [`../limitations.md`](../limitations.md)) —
-so this is a non-issue for `stw`'s use of PyTom specifically, but if you use
-this same conda env for PyTom's own alignment tools outside `stw`, be aware
-it may not be available.
+Many PyTom builds — including the one this classification adapter was
+validated against — don't have a compiled `_swig_frm` extension (PyTom's
+FRM alignment-search module). `stw`'s **classification** adapter always
+passes `-a` (no-align) regardless, since it assumes pre-aligned input
+project-wide anyway (see [`../limitations.md`](../limitations.md)) — so this
+is a non-issue for classification specifically.
+
+**`stw align`** (see [`../align.md`](../align.md)) is the one place this
+extension actually matters — it drives PyTom's real FRM alignment search,
+which needs it compiled. This is a real compile, not a config flag (PyTom's
+own installer just silently disables this piece rather than failing, on any
+modern gcc): run
+
+```console
+scripts/compile_pytom_frm.sh
+```
+
+once against your `pytom_env`. See [`../align.md`](../align.md) for what
+this actually gets you and its real limitations.
 
 ## What `stw` actually does with it
 

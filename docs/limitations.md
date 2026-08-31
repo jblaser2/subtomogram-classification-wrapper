@@ -21,13 +21,15 @@ signal (and has caught real ones); a perfect one isn't a benchmark result.
 
 ## Alignment
 
-`stw` requires **pre-aligned (`alignment_state: fine`) input** for every package
-currently wired up. Every native launcher these adapters wrap assumes this:
-they apply existing particle poses rather than searching for new ones. Real
-particle alignment (translational + angular refinement) is a substantially
-different, much slower problem, and each package's own aligner works
-differently — supporting it properly is a separate, later effort (a planned
-`stw align` subcommand), not something bolted onto the classification wrapper.
+`stw` requires **pre-aligned (`alignment_state: fine`) input** for every
+*classification* package wired up — every native launcher those adapters
+wrap assumes this, applying existing particle poses rather than searching
+for new ones. `stw align` (see [`docs/align.md`](align.md)) now provides
+one real aligner (PyTom's FRM) for *roughly*-aligned input specifically —
+it is not a from-scratch/genuinely-unaligned-data aligner (see that page
+for exactly what it can and can't do, and why two other candidates —
+STA's own hand-rolled script, Dynamo's `dalign` — were investigated and
+not used).
 
 - `alignment_state: rough` is accepted with a warning only — **no package here
   actually re-aligns rough input, and nothing else about the run changes

@@ -34,6 +34,7 @@ nav:
   - Designing a mask: mask-design.md
   - What each package does: packages.md
   - GUI: gui.md
+  - Aligning rough input: align.md
   - Limitations: limitations.md
   - Installing packages:
       - EMAN2: install/eman2.md

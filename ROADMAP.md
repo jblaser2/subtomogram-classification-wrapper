@@ -316,6 +316,64 @@ file tracks the public milestone sequence.
   (every prior adapter test used a fresh `tmp_path` per test) — a reminder that
   fixture-only testing has a real blind spot around exactly this kind of
   cross-run/cross-dataset state.
+- [x] **M13 — `stw align`**, real fine alignment for roughly-aligned (not
+  from-scratch unaligned) input, closing part of the gap `docs/limitations.md`'s
+  Alignment section had flagged since M0. Investigated three candidates before
+  building anything (see `docs/align.md` for the full writeup): STA's own
+  hand-rolled NumPy aligner (real and blind, but local-refinement-only — 61 random
+  rotation candidates within ±15° of the *current* pose, never validated on
+  genuinely unaligned data), Dynamo's `dalign` (a real global search, free plumbing
+  reuse from the existing Dynamo adapter, but every real attempt at it crashed on
+  an unresolved bug inside Dynamo's own compiled table-serialization binary,
+  triggered unpredictably by particle count), and PyTom's FRM (Fast Rotational
+  Matching) — chosen. FRM is a genuine global SO(3) search (spherical-harmonic
+  correlation, multi-seed) plus joint translational refinement via PyTom's own real
+  gold-standard (even/odd, FSC-driven) protocol; confirmed by directly compiling
+  and running it, not just reading source.
+
+  The compiled `_swig_frm` extension most PyTom builds lack (PyTom's own installer
+  silently disables it on any modern gcc rather than failing) turned out to be a
+  bounded, real fix, not a rewrite: `scripts/compile_pytom_frm.sh` clones PyTom
+  fresh and builds its bundled 1997-era spherical-harmonics/Situs source with a
+  handful of relaxed C flags (`-std=gnu89 -fcommon -Wno-implicit-function-declaration`
+  etc.) plus a `$ORIGIN` rpath fix, verified end-to-end from a truly fresh clone (not
+  just the dev copy used to find the fix) and by running a real self-alignment
+  through the result (score=1.0, correct position, as expected). A second, separate
+  real cross-version break found while wiring this up: PyTom's own
+  `pytom/bin/FRMAlignment.py` still does `import pytom_mpi`/
+  `from pytom_volume import ...` (pre-refactor flat module names only resolvable
+  today via `pytom.lib.*`) — worked around with a small vendored runner that aliases
+  them into `sys.modules` before running `FRMAlignment`'s own `__main__`, rather
+  than patching PyTom's own source (the same shim class as the classification
+  adapter's own `Score` fix).
+
+  New `src/stw/align/` (not an Adapter — alignment has no k/seed/class-label
+  contract): `AlignConfig`, `run_pytom_alignment()`, a new `ReqKind.CONDA_PYTHON_IMPORT`
+  requirement kind (checks importability *inside* a named conda env via subprocess,
+  since `stw` never runs inside a package's own env). Bootstraps its own reference
+  (a plain average, no ground truth needed) and reuses ~80% of the existing PyTom
+  classification adapter's plumbing (ParticleList XML, `mpirun` dispatch, the same
+  `SingleTiltWedge` wedge model). The expensive MPI search step is cached
+  (a bare re-run skips it entirely — found and fixed during verification: the first
+  version cached only the prep steps, not the actual alignment). New `stw align` CLI
+  command and a collapsible "Align first" GUI section, both requiring their own
+  alignment mask — **reusing the classification mask for alignment was tried once in
+  the source project and silently destroyed the classification signal** (blind ARI
+  0.637 -> near-chance, since the translation search registers every particle onto
+  whatever's inside the mask); `stw`'s own docs and GUI copy call this out
+  explicitly rather than letting a user rediscover it.
+
+  Verified end-to-end (native tests + a real GUI HTTP API test) on a real,
+  deliberately roughly-misaligned copy of the tiny fixture (small random
+  rotation+shift applied per particle, real scipy transforms): 4 real FSC-tracked
+  iterations, sharpness (voxel std) recovered from 0.136 (rough) to 0.165 (vs. the
+  truly-aligned fixture's own 0.168), poses written to a CSV for provenance, and the
+  aligned output classifies cleanly through a normal `stw run` with zero format
+  bridging. Honest limitation, stated directly in `docs/align.md`: the one real-data
+  test in the source project (already-well-aligned T4P, as a sanity check, not
+  genuinely rough data) showed no improvement by visual inspection — this has never
+  been validated on real, genuinely rough data, only synthetic ones built for this
+  verification.
 
 ## Package install tiers
 
