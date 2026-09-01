@@ -181,6 +181,41 @@ All notable changes to this project are documented here.
   pre-aligned fixture's own 0.168), the aligned output classifies cleanly through a
   normal `stw run` with no format bridging, and a bare re-run correctly skips the
   expensive MPI search entirely. `docs/align.md` added.
+- **GUI dataset/mask preview: progress bar + shared cache.** Previewing a large,
+  real-world particle set (e.g. an 80k-particle EMPIAR download) streams every
+  particle off disk to build the unweighted global average, tens of minutes at that
+  scale — `/api/preview` and `/api/preview-mask` now run this as a background job with
+  a live SSE progress bar (particles loaded so far / total) instead of blocking the
+  request, and both share one in-memory cache keyed by the particle set's fingerprint
+  (`_cached_global_average()`), so previewing the mask right after previewing the
+  dataset (or vice versa, including the `mask.kind: auto` path, which was quietly
+  recomputing the same average a second time internally) no longer re-streams the
+  whole particle set. A bad mask form (missing radius, `kind: none`) still fails
+  synchronously with a 422, before any background job starts.
+- **`subsample`** config field — caps particle count via a random, seeded draw
+  (`ParticleSet.subsample()`) before any package runs, for datasets too large to
+  classify with every package in a first pass (the motivating case: an
+  ~80,000-particle EMPIAR download). Re-sorted after sampling so the canonical
+  file-row order every adapter relies on is preserved; changes the particle set's
+  fingerprint, so a subsampled run gets its own cache rather than colliding with (or
+  reusing) a full run's. `RunReport.n_particles_total`/`n_particles_used` record what
+  actually ran. New "Subsample to N particles" + seed fields in `stw gui`.
+- **Per-package Cancel button.** Every package in a run gets a Cancel button in `stw
+  gui`'s live progress panel, available from the moment the run starts (packages run
+  strictly sequentially, so anything after the first is shown "queued" with its own
+  working Cancel button, not just the one currently running). Cancelling a queued
+  package skips it outright; cancelling a running one kills its subprocess (and its
+  whole process group, so an MPI-launched job's worker processes die too, not just the
+  parent `mpirun`) within about half a second via a new `process.cancel_scope()` /
+  `JobCancelled` mechanism — implemented once at the `run_streaming()` choke point via
+  a context variable, so no individual adapter needed any code changes. A killed job's
+  ordinary `status='failed'` PackageResult is reclassified to `status='cancelled'` by
+  the orchestrator, the one place that already knows cancellation was requested. HAC
+  Baseline is the one adapter that can only be cancelled before it starts (it runs
+  in-process, no subprocess to kill). The CLI is unaffected either way — `cancel_flags`
+  defaults to `None`, so a bare `stw run` behaves exactly as before, including Ctrl-C
+  still killing launched subprocesses (they stay in the terminal's own process group
+  unless a real cancel_event is in play).
 
 ### Fixed
 - PyTom's `mpirun` call failed outright inside a container (OpenMPI's `prterun` refuses to run

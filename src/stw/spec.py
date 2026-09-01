@@ -9,7 +9,9 @@ are also constructed internally by the orchestrator, not just parsed from user Y
 """
 from __future__ import annotations
 
+import dataclasses
 import hashlib
+import random
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -153,6 +155,19 @@ class ParticleSet:
 
     def path_for(self, filename: str) -> Path:
         return self.particle_dir / filename
+
+    def subsample(self, n: int, seed: int = 0) -> ParticleSet:
+        """Returns a new ParticleSet with a random subset of `n` particles (all of
+        them if `n >= len(self)`) -- for datasets too large to classify in a
+        reasonable time (e.g. an 80k-particle EMPIAR download). `seed` makes the
+        draw reproducible; re-sorted afterward since `files` is the canonical row
+        order every adapter relies on, not just an artifact of `discover()`."""
+        if n < 1:
+            raise ParticleSetError(f"subsample must be >= 1, got {n}")
+        if n >= len(self.files):
+            return self
+        chosen = random.Random(seed).sample(self.files, n)
+        return dataclasses.replace(self, files=tuple(sorted(chosen)))
 
     def fingerprint(self) -> str:
         """Identifies this exact particle set (directory + pattern + file list +

@@ -80,6 +80,19 @@
         <option value="unaligned">unaligned</option>
       </select>
     </label>
+    <div class="row">
+      <label>Subsample to N particles (optional)
+        <input type="number" step="1" min="1" id="f-subsample" placeholder="use all particles">
+      </label>
+      <label>Subsample seed
+        <input type="number" step="1" id="f-subsample-seed" value="0">
+      </label>
+    </div>
+    <p class="muted" style="margin: 0 0 10px;">
+      Useful for very large datasets (tens of thousands of particles) — draws a
+      random subset once and classifies only that subset, instead of the whole
+      directory.
+    </p>
     <button id="preview-btn" type="button" class="secondary-btn">Preview dataset</button>
     <div id="preview-result" class="preview-slot"></div>
 

@@ -238,7 +238,7 @@ function buildConfig() {
 
   const packages = Array.from(document.querySelectorAll("#package-picker input:checked")).map((el) => el.value);
 
-  return {
+  const config = {
     particles: $("f-particles").value,
     pattern: $("f-pattern").value,
     pixel_size: numOrNull("f-pixel-size"),
@@ -251,6 +251,12 @@ function buildConfig() {
     out_dir: $("f-out-dir").value,
     packages,
   };
+  const subsample = numOrNull("f-subsample");
+  if (subsample !== null) {
+    config.subsample = subsample;
+    config.subsample_seed = numOrNull("f-subsample-seed") ?? 0;
+  }
+  return config;
 }
 
 // ---------- progress panel ----------
@@ -266,17 +272,53 @@ function resetProgressPanel() {
   setProgressCollapsed(false); // a fresh run should always start visible
 }
 
-function ensureJobRow(pkg) {
+function ensureJobRow(pkg, status = "starting…") {
   if (jobRows[pkg]) return jobRows[pkg];
   const el = document.createElement("div");
   el.className = "job-row";
   el.innerHTML = `
-    <div class="job-head"><span>${pkg}</span><span class="job-status">starting…</span></div>
+    <div class="job-head">
+      <span>${pkg}</span>
+      <span class="job-status">${status}</span>
+      <button type="button" class="cancel-btn" onclick="cancelPackage('${pkg}')">cancel</button>
+    </div>
     <div class="bar-track"><div class="bar-fill"></div></div>
   `;
   $("progress-list").appendChild(el);
   jobRows[pkg] = el;
   return el;
+}
+
+// Caller must add the outcome class ("done"/"failed"/"cancelled") beforehand --
+// this only finalizes the row's shared visual bits (label, full bar, no more
+// cancel button), it doesn't decide which outcome happened.
+function finishJobRow(row, label) {
+  row.querySelector(".job-status").textContent = label;
+  row.querySelector(".bar-fill").style.width = "100%";
+  row.querySelector(".cancel-btn")?.remove(); // may already be gone (see cancelPackage())
+}
+
+function jobRowIsTerminal(row) {
+  return row.classList.contains("done") || row.classList.contains("failed") || row.classList.contains("cancelled");
+}
+
+async function cancelPackage(pkg) {
+  const row = jobRows[pkg];
+  if (!row) return;
+  const btn = row.querySelector(".cancel-btn");
+  if (btn) btn.disabled = true;
+  row.querySelector(".job-status").textContent = "cancelling…";
+  await fetch(`/api/runs/${currentRunId}/cancel/${pkg}`, { method: "POST" }).catch(() => {});
+  // Only resolve the row here if it never actually started: once running, the
+  // killed subprocess produces a real finish_job event shortly (see
+  // process._watch_for_cancel's ~0.5s poll) with the real "cancelled by user"
+  // message, which should win over a guess made here. A package that was still
+  // queued, though, will never get an SSE event at all (the orchestrator skips
+  // it silently) -- nothing else will ever resolve that row, so do it here.
+  if (row.dataset.started !== "1" && !jobRowIsTerminal(row)) {
+    row.classList.add("cancelled");
+    finishJobRow(row, "cancelled (skipped, was still queued)");
+  }
 }
 
 function handleEvent(evt) {
@@ -289,6 +331,7 @@ function handleEvent(evt) {
   const status = row.querySelector(".job-status");
   const bar = row.querySelector(".bar-fill");
   if (event === "start_job") {
+    row.dataset.started = "1";
     status.textContent = "starting…";
   } else if (event === "step") {
     status.textContent = payload.name;
@@ -297,9 +340,10 @@ function handleEvent(evt) {
   } else if (event === "substep") {
     status.textContent = payload.text;
   } else if (event === "finish_job") {
-    row.classList.add(payload.ok ? "done" : "failed");
-    status.textContent = payload.ok ? `done ${payload.message}` : `failed — ${payload.message}`;
-    bar.style.width = "100%";
+    if (!jobRowIsTerminal(row)) {
+      row.classList.add(payload.ok ? "done" : "failed");
+      finishJobRow(row, payload.ok ? `done ${payload.message}` : `failed — ${payload.message}`);
+    }
   }
 }
 
@@ -347,8 +391,14 @@ async function startRun() {
     $("run-btn").disabled = false;
     return;
   }
-  const { run_id } = await res.json();
+  const { run_id, packages } = await res.json();
   currentRunId = run_id;
+  // Created only now that currentRunId is set (cancelPackage() posts to
+  // /api/runs/${currentRunId}/cancel/..., so a row must never be clickable
+  // before that's valid) -- in "queued" state, so a package still waiting its
+  // turn (jobs run strictly sequentially) has a Cancel button immediately,
+  // not only once it actually starts.
+  for (const pkg of packages) ensureJobRow(pkg, "queued…");
 
   if (currentEventSource) currentEventSource.close();
   currentEventSource = new EventSource(`/api/runs/${run_id}/events`);
@@ -377,7 +427,10 @@ async function finishRun(payload) {
 }
 
 function statusBadge(status) {
-  const cls = status === "ok" ? "ok" : status === "skipped" || status === "missing_requirements" ? "warn" : "fail";
+  const cls = status === "ok" ? "ok"
+    : status === "cancelled" ? "cancel"
+    : status === "skipped" || status === "missing_requirements" ? "warn"
+    : "fail";
   return `<span class="badge ${cls}">${status}</span>`;
 }
 
@@ -455,7 +508,12 @@ function renderResults(report) {
         .join("")}</div>`
     : "";
 
+  const subsampleNote = report.n_particles_total != null && report.n_particles_used !== report.n_particles_total
+    ? `<p class="muted">Subsampled to ${report.n_particles_used}/${report.n_particles_total} particles.</p>`
+    : "";
+
   body.innerHTML = `
+    ${subsampleNote}
     <table>
       <thead><tr><th>package</th><th>k</th><th>seed</th><th>status</th><th>time</th><th>classes</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
@@ -493,10 +551,18 @@ function closePreviewBox(boxId) {
   box.innerHTML = "";
 }
 
+function progressBarHtml(done, total) {
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  return `
+    <div class="progress-bar"><div class="progress-bar-fill" style="width: ${pct}%"></div></div>
+    <div class="preview-specs">loading particles: ${done} / ${total} (${pct}%)</div>
+  `;
+}
+
 async function runPreview(endpoint, boxId, extraBody, closeLabel) {
   const box = $(boxId);
   box.className = "preview-slot";
-  box.textContent = "Loading…";
+  box.textContent = "Scanning particle directory…";
 
   const body = {
     particles: $("f-particles").value,
@@ -521,6 +587,36 @@ async function runPreview(endpoint, boxId, extraBody, closeLabel) {
     box.textContent = detail.detail;
     return;
   }
+  const { preview_id, n_particles } = await res.json();
+
+  box.className = "preview-slot preview-box";
+  box.innerHTML = progressBarHtml(0, n_particles);
+
+  const es = new EventSource(`/api/preview/${preview_id}/events`);
+  es.onmessage = async (msg) => {
+    const evt = JSON.parse(msg.data);
+    if (evt.event === "preview_complete") {
+      es.close();
+      await finishPreview(preview_id, boxId, closeLabel, evt.payload);
+      return;
+    }
+    if (evt.event === "progress") box.innerHTML = progressBarHtml(evt.payload.done, evt.payload.total);
+  };
+  es.onerror = () => {
+    es.close();
+    box.className = "preview-slot error";
+    box.textContent = "lost connection to the preview job";
+  };
+}
+
+async function finishPreview(previewId, boxId, closeLabel, payload) {
+  const box = $(boxId);
+  if (payload.status !== "done") {
+    box.className = "preview-slot error";
+    box.textContent = payload.error || "preview failed";
+    return;
+  }
+  const res = await fetch(`/api/preview/${previewId}/result`);
   const d = await res.json();
   box.className = "preview-slot preview-box";
   box.innerHTML = `

@@ -68,6 +68,10 @@ class RunState:
     report: dict | None = None
     out_dir: str | None = None
     events: queue.Queue = field(default_factory=queue.Queue)
+    # One Event per requested package, created at submit time (see start_run()) --
+    # lets /api/runs/{id}/cancel/{package} signal a live run_config() call without
+    # any other coupling between the HTTP layer and the background run thread.
+    cancel_flags: dict[str, threading.Event] = field(default_factory=dict)
 
 
 RUNS: dict[str, RunState] = {}
@@ -83,6 +87,92 @@ class AlignState:
 
 
 ALIGNS: dict[str, AlignState] = {}
+
+
+@dataclass
+class PreviewState:
+    preview_id: str
+    status: str = "running"  # running | done | error
+    error: str | None = None
+    result: dict | None = None
+    events: queue.Queue = field(default_factory=queue.Queue)
+
+
+PREVIEWS: dict[str, PreviewState] = {}
+
+# The global average is the expensive part of both the dataset preview and the
+# mask preview (streaming every particle volume off disk, tens of minutes at
+# ATPase-EMPIAR scale -- 83k particles). Keyed by ParticleSet.fingerprint() so
+# "preview mask" right after "preview dataset" reuses the same array instead of
+# recomputing it, and vice versa. Small FIFO cap since this is an in-memory,
+# single-user, no-persistence process (same story as RUNS/ALIGNS).
+_GLOBAL_AVG_CACHE: dict[str, np.ndarray] = {}
+_GLOBAL_AVG_CACHE_ORDER: list[str] = []
+_GLOBAL_AVG_CACHE_MAX = 4
+
+
+def _cached_global_average(
+    particles: ParticleSet, progress_cb: Any = None
+) -> np.ndarray:
+    key = particles.fingerprint()
+    cached = _GLOBAL_AVG_CACHE.get(key)
+    if cached is not None:
+        return cached
+    avg = global_average(particles.particle_dir, list(particles.files), progress_cb=progress_cb)
+    _GLOBAL_AVG_CACHE[key] = avg
+    _GLOBAL_AVG_CACHE_ORDER.append(key)
+    if len(_GLOBAL_AVG_CACHE_ORDER) > _GLOBAL_AVG_CACHE_MAX:
+        _GLOBAL_AVG_CACHE.pop(_GLOBAL_AVG_CACHE_ORDER.pop(0), None)
+    return avg
+
+
+def _throttled_progress(q: queue.Queue, total: int):
+    """~200 SSE events for the whole run regardless of particle count, so an
+    83k-particle dataset doesn't flood the queue with one put() per particle."""
+    step = max(1, total // 200)
+
+    def cb(done: int, total_: int) -> None:
+        if done == total_ or done % step == 0:
+            q.put({"event": "progress", "payload": {"done": done, "total": total_}})
+
+    return cb
+
+
+def _execute_preview(preview_id: str, particles: ParticleSet, mask_body: dict[str, Any] | None) -> None:
+    from fastapi import HTTPException
+
+    state = PREVIEWS[preview_id]
+    q = state.events
+    total = len(particles.files)
+    progress_cb = _throttled_progress(q, total)
+    try:
+        avg = _cached_global_average(particles, progress_cb=progress_cb)
+        if mask_body is not None:
+            from stw.gui.render import render_mask_overlay_png
+
+            mask = _build_preview_mask(mask_body, particles, avg=avg)
+            png_bytes = render_mask_overlay_png(avg, mask, title=f"mask preview, n={total}")
+        else:
+            from stw.gui.render import render_volume_slice_png
+
+            png_bytes = render_volume_slice_png(avg, title=f"global average, n={total}")
+        import base64
+
+        state.result = {
+            "n_particles": total,
+            "box": particles.box,
+            "pixel_size": particles.pixel_size,
+            "preview_png_base64": base64.b64encode(png_bytes).decode("ascii"),
+        }
+        state.status = "done"
+    except HTTPException as e:
+        state.status = "error"
+        state.error = str(e.detail)
+    except Exception as e:  # noqa: BLE001 - surfaced to the UI, not swallowed
+        state.status = "error"
+        state.error = str(e)
+    finally:
+        q.put(None)
 
 
 def _caps_to_dict(caps: Capabilities) -> dict:
@@ -113,10 +203,34 @@ def _discover_particles(body: dict[str, Any]) -> ParticleSet:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
-def _build_preview_mask(mask_body: dict[str, Any], particles: ParticleSet) -> np.ndarray:
+def _validate_mask_body(mask_body: dict[str, Any]) -> None:
+    """Fails fast (422, before any background work starts) on mask configs missing
+    fields no amount of particle loading could ever fill in -- called synchronously
+    from the endpoint so a bad mask form doesn't need a background job + SSE round
+    trip just to report a typo."""
+    from fastapi import HTTPException
+
+    kind = mask_body.get("kind", "auto")
+    if kind == "sphere" and mask_body.get("radius") is None:
+        raise HTTPException(status_code=422, detail="mask kind=sphere requires radius")
+    if kind == "cylinder" and (mask_body.get("radius") is None or mask_body.get("half_height") is None):
+        raise HTTPException(status_code=422, detail="mask kind=cylinder requires radius and half_height")
+    if kind == "file" and not mask_body.get("path"):
+        raise HTTPException(status_code=422, detail="mask kind=file requires path")
+    if kind == "none":
+        raise HTTPException(status_code=422, detail="mask kind=none has no mask to preview")
+
+
+def _build_preview_mask(
+    mask_body: dict[str, Any], particles: ParticleSet, *, avg: np.ndarray | None = None
+) -> np.ndarray:
     """Builds a mask straight from the mask primitives (build_sphere/build_cylinder/
     auto_sphere_mask/load_mrc), not resolve_mask() -- this is a throwaway preview with
-    no run/cache_dir to key a cached mask file under, and shouldn't write one."""
+    no run/cache_dir to key a cached mask file under, and shouldn't write one.
+    Assumes _validate_mask_body() already passed.
+
+    `avg`: an already-computed global average, forwarded to auto_sphere_mask() for
+    kind="auto" so it doesn't stream every particle off disk a second time."""
     from fastapi import HTTPException
 
     from stw.io.mrc import load_mrc
@@ -130,20 +244,14 @@ def _build_preview_mask(mask_body: dict[str, Any], particles: ParticleSet) -> np
     edge = float(mask_body.get("edge", 3.0))
 
     if kind == "sphere":
-        if mask_body.get("radius") is None:
-            raise HTTPException(status_code=422, detail="mask kind=sphere requires radius")
         return build_sphere(shape, center, float(mask_body["radius"]), edge)
     if kind == "cylinder":
-        if mask_body.get("radius") is None or mask_body.get("half_height") is None:
-            raise HTTPException(status_code=422, detail="mask kind=cylinder requires radius and half_height")
         axis = mask_body.get("axis", "z")
         return build_cylinder(shape, center, float(mask_body["radius"]), float(mask_body["half_height"]), axis, edge)
     if kind == "auto":
-        mask, _center, _radius = auto_sphere_mask(particles)
+        mask, _center, _radius = auto_sphere_mask(particles, avg=avg)
         return mask
     if kind == "file":
-        if not mask_body.get("path"):
-            raise HTTPException(status_code=422, detail="mask kind=file requires path")
         try:
             mask = load_mrc(mask_body["path"])
         except Exception as e:
@@ -153,7 +261,7 @@ def _build_preview_mask(mask_body: dict[str, Any], particles: ParticleSet) -> np
                 status_code=422, detail=f"mask file shape {mask.shape} != particle box {shape}"
             )
         return mask
-    raise HTTPException(status_code=422, detail="mask kind=none has no mask to preview")
+    raise HTTPException(status_code=422, detail=f"unknown mask kind: {kind}")
 
 
 def _execute_align(align_id: str, cfg: AlignConfig) -> None:
@@ -175,7 +283,7 @@ def _execute(run_id: str, cfg: RunConfig) -> None:
     state = RUNS[run_id]
     sink = QueueProgressSink(state.events)
     try:
-        report = run_config(cfg, progress=sink)
+        report = run_config(cfg, progress=sink, cancel_flags=state.cancel_flags)
         state.report = asdict(report)
         state.out_dir = str(cfg.out_dir)
         state.status = "done"
@@ -212,43 +320,70 @@ def create_app():
 
     @app.post("/api/preview")
     def preview_dataset(body: dict[str, Any]) -> dict:
-        """Loads the particle set (no run started) and returns its specs plus a
-        central-slice PNG of the unweighted global average, so a config can be
-        sanity-checked before committing to a full run."""
-        import base64
-
-        from stw.gui.render import render_volume_slice_png
-
+        """Loads the particle set (no run started) and kicks off, in a background
+        thread, the unweighted global average that a central-slice preview PNG
+        needs -- streaming every particle off disk is the slow part at real-dataset
+        scale (tens of minutes for tens of thousands of particles), so this returns
+        a preview_id immediately; poll progress via /api/preview/{id}/events and
+        fetch the finished PNG via /api/preview/{id}/result."""
         particles = _discover_particles(body)
-        avg = global_average(particles.particle_dir, list(particles.files))
-        png_bytes = render_volume_slice_png(avg, title=f"global average, n={len(particles.files)}")
-        return {
-            "n_particles": len(particles.files),
-            "box": particles.box,
-            "pixel_size": particles.pixel_size,
-            "preview_png_base64": base64.b64encode(png_bytes).decode("ascii"),
-        }
+        preview_id = uuid.uuid4().hex[:12]
+        PREVIEWS[preview_id] = PreviewState(preview_id=preview_id)
+        thread = threading.Thread(target=_execute_preview, args=(preview_id, particles, None), daemon=True)
+        thread.start()
+        return {"preview_id": preview_id, "n_particles": len(particles.files)}
 
     @app.post("/api/preview-mask")
     def preview_mask(body: dict[str, Any]) -> dict:
-        """Same particle-set load as /api/preview, plus builds the mask straight
-        from the current form's mask.* fields (never resolve_mask() -- there's no
-        run/cache_dir here) and overlays it as a semi-transparent color fill on the
-        same central-slice global average."""
-        import base64
-
-        from stw.gui.render import render_mask_overlay_png
-
+        """Same particle-set load and background-job shape as /api/preview, plus
+        builds the mask straight from the current form's mask.* fields (never
+        resolve_mask() -- there's no run/cache_dir here) to overlay as a
+        semi-transparent color fill on the central-slice global average. The
+        global average itself is shared with /api/preview via
+        _cached_global_average() keyed on the particle set's fingerprint, so
+        previewing the mask right after previewing the dataset (or vice versa)
+        does not re-stream the whole particle set off disk a second time."""
         particles = _discover_particles(body)
-        mask = _build_preview_mask(body.get("mask") or {}, particles)
-        avg = global_average(particles.particle_dir, list(particles.files))
-        png_bytes = render_mask_overlay_png(avg, mask, title=f"mask preview, n={len(particles.files)}")
-        return {
-            "n_particles": len(particles.files),
-            "box": particles.box,
-            "pixel_size": particles.pixel_size,
-            "preview_png_base64": base64.b64encode(png_bytes).decode("ascii"),
-        }
+        mask_body = body.get("mask") or {}
+        _validate_mask_body(mask_body)
+        preview_id = uuid.uuid4().hex[:12]
+        PREVIEWS[preview_id] = PreviewState(preview_id=preview_id)
+        thread = threading.Thread(
+            target=_execute_preview, args=(preview_id, particles, mask_body), daemon=True
+        )
+        thread.start()
+        return {"preview_id": preview_id, "n_particles": len(particles.files)}
+
+    @app.get("/api/preview/{preview_id}/events")
+    def preview_events(preview_id: str):
+        state = PREVIEWS.get(preview_id)
+        if state is None:
+            raise HTTPException(status_code=404, detail="unknown preview_id")
+
+        def gen():
+            while True:
+                item = state.events.get()
+                if item is None:
+                    final = {
+                        "event": "preview_complete",
+                        "payload": {"status": state.status, "error": state.error},
+                    }
+                    yield f"data: {json.dumps(final)}\n\n"
+                    break
+                yield f"data: {json.dumps(item)}\n\n"
+
+        return StreamingResponse(gen(), media_type="text/event-stream")
+
+    @app.get("/api/preview/{preview_id}/result")
+    def preview_result(preview_id: str) -> dict:
+        state = PREVIEWS.get(preview_id)
+        if state is None:
+            raise HTTPException(status_code=404, detail="unknown preview_id")
+        if state.status == "running":
+            raise HTTPException(status_code=409, detail="preview still in progress")
+        if state.status == "error":
+            raise HTTPException(status_code=500, detail=state.error)
+        return state.result
 
     @app.get("/api/align/check")
     def align_check() -> dict:
@@ -323,7 +458,7 @@ def create_app():
             raise HTTPException(status_code=404, detail="no completed alignment for this align_id")
         aligned_dir = state.report["aligned_particle_dir"]
         particles = ParticleSet.discover(aligned_dir, "*.mrc")
-        avg = global_average(particles.particle_dir, list(particles.files))
+        avg = _cached_global_average(particles)
         png_bytes = render_volume_slice_png(avg, title=f"aligned average, n={len(particles.files)}")
         return {
             "n_particles": len(particles.files),
@@ -337,10 +472,25 @@ def create_app():
         except Exception as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
         run_id = uuid.uuid4().hex[:12]
-        RUNS[run_id] = RunState(run_id=run_id)
+        # One Event per requested package, created up front -- lets the Cancel
+        # button work even for a package still queued behind an earlier one
+        # (jobs run strictly sequentially), not just one already mid-subprocess.
+        cancel_flags = {pkg: threading.Event() for pkg in cfg.packages}
+        RUNS[run_id] = RunState(run_id=run_id, cancel_flags=cancel_flags)
         thread = threading.Thread(target=_execute, args=(run_id, cfg), daemon=True)
         thread.start()
-        return {"run_id": run_id}
+        return {"run_id": run_id, "packages": cfg.packages}
+
+    @app.post("/api/runs/{run_id}/cancel/{package}")
+    def cancel_package(run_id: str, package: str) -> dict:
+        state = RUNS.get(run_id)
+        if state is None:
+            raise HTTPException(status_code=404, detail="unknown run_id")
+        event = state.cancel_flags.get(package)
+        if event is None:
+            raise HTTPException(status_code=404, detail=f"{package!r} was not part of this run")
+        event.set()
+        return {"cancelled": package}
 
     @app.get("/api/runs/{run_id}/events")
     def run_events(run_id: str):

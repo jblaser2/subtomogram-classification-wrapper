@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-Status = Literal["ok", "failed", "skipped", "missing_requirements", "incompatible"]
+Status = Literal["ok", "failed", "skipped", "missing_requirements", "incompatible", "cancelled"]
 
 
 @dataclass

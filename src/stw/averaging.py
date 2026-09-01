@@ -8,6 +8,7 @@ path here uses instead.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -24,6 +25,7 @@ def class_averages(
     labels: dict[str, int],
     *,
     normalize: bool = False,
+    progress_cb: Callable[[int, int], None] | None = None,
 ) -> tuple[dict[int, np.ndarray], dict[int, int]]:
     """Stream-average particle volumes grouped by integer class label.
 
@@ -32,6 +34,10 @@ def class_averages(
         labels: {filename: class_int}. Filenames are resolved under `particle_dir`.
         normalize: if True, zero-mean/unit-std normalize each average (useful when
             comparing packages with very different intensity scales).
+        progress_cb: if given, called as `progress_cb(done, total)` after each
+            particle is considered (loaded or skipped) — total = len(labels). For
+            large particle sets (tens of thousands of files) this loop is the slow
+            part of a GUI preview, so callers that want a progress bar hook in here.
 
     Returns:
         (averages, counts) — averages maps class_int -> mean volume (float32);
@@ -44,15 +50,17 @@ def class_averages(
     # never appears in `counts` at all and EmptyClassError never fires.
     counts: dict[int, int] = {cls: 0 for cls in set(labels.values())}
 
-    for filename, cls in labels.items():
+    total = len(labels)
+    for i, (filename, cls) in enumerate(labels.items(), start=1):
         path = d / filename
-        if not path.exists():
-            continue
-        vol = load_mrc(path)
-        if cls not in acc:
-            acc[cls] = np.zeros_like(vol, dtype=np.float64)
-        acc[cls] += vol
-        counts[cls] += 1
+        if path.exists():
+            vol = load_mrc(path)
+            if cls not in acc:
+                acc[cls] = np.zeros_like(vol, dtype=np.float64)
+            acc[cls] += vol
+            counts[cls] += 1
+        if progress_cb is not None:
+            progress_cb(i, total)
 
     empty = [cls for cls, n in counts.items() if n == 0]
     if empty:
@@ -68,9 +76,14 @@ def class_averages(
     return averages, counts
 
 
-def global_average(particle_dir: str | Path, files: list[str]) -> np.ndarray:
+def global_average(
+    particle_dir: str | Path,
+    files: list[str],
+    *,
+    progress_cb: Callable[[int, int], None] | None = None,
+) -> np.ndarray:
     """Unweighted average of every listed particle — used by the blind/auto mask
     builder, which needs a density envelope with no class labels at all."""
     labels = {f: 0 for f in files}
-    averages, _ = class_averages(particle_dir, labels)
+    averages, _ = class_averages(particle_dir, labels, progress_cb=progress_cb)
     return averages[0]

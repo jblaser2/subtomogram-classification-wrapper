@@ -47,11 +47,22 @@ stw gui --host 0.0.0.0       # bind beyond localhost (LAN-reachable — see note
    available for `sphere`/`cylinder` — see
    [`docs/mask-design.md`](mask-design.md) for what `cylinder`'s `axis`
    (its long axis) vs. `radius` (perpendicular to that axis) actually mean.
+   "Subsample to N particles" (blank = use every particle) draws a random,
+   seeded (`Subsample seed`) subset of that size once and classifies only
+   that subset — useful for a real-world download in the tens of thousands
+   of particles (e.g. an EMPIAR dataset), where classifying every particle
+   with every package isn't practical for a first pass.
 2. **Preview dataset / Preview mask** — load the particle set (particle
    count, box, pixel size, a central-slice image of the global average) or
    overlay the current mask form values on that same slice as a
    semi-transparent color fill, both with no run started. Each has its own
-   "Close" button to clear it back out of the sidebar.
+   "Close" button to clear it back out of the sidebar. Loading the global
+   average streams every particle off disk, the slow part at real-dataset
+   scale (tens of minutes for tens of thousands of particles) — both run as
+   a background job with a live progress bar (particles loaded so far / total),
+   and share one in-memory cache keyed by the particle set's fingerprint, so
+   previewing the mask right after previewing the dataset (or vice versa)
+   does not re-stream the whole particle set a second time.
 3. **Packages** — every registered adapter, live install status (green/red
    dot, from the same `check_installed()` the CLI's `stw check-env` runs),
    pre-checked when installed, plus a one-line algorithm summary and a
@@ -59,11 +70,20 @@ stw gui --host 0.0.0.0       # bind beyond localhost (LAN-reachable — see note
    [`docs/packages.md`](packages.md)).
 4. **Run** — submits the config, then streams live per-package progress
    (the same step/substep events `stw run`'s Rich progress bars show) over
-   Server-Sent Events. The Progress panel auto-collapses once the run
-   finishes (a "show" toggle in its header reopens it — useful for checking
-   a failure message or per-job timing after the fact) and always reopens
-   itself at the start of a new run.
-5. **Results** — a table of every job's status/timing/class sizes; a
+   Server-Sent Events. Every requested package gets a row immediately, in a
+   "queued" state, each with its own **Cancel** button — clicking it kills
+   that package's job (its subprocess, and its process group, so e.g. an
+   MPI-launched job's worker processes die too) if it's already running, or
+   skips it outright if it's still queued behind an earlier one, without
+   affecting any other package in the run. HAC Baseline is the one exception:
+   it runs in-process (no subprocess), so it can only be cancelled before it
+   starts, not mid-computation. The Progress panel auto-collapses once the
+   run finishes (a "show" toggle in its header reopens it — useful for
+   checking a failure message or per-job timing after the fact) and always
+   reopens itself at the start of a new run.
+5. **Results** — a table of every job's status (including `cancelled`, for
+   anything killed or skipped via the Cancel button)/timing/class sizes,
+   with a note at the top if subsampling was used (N used / N total); a
    (package, k) with more than one seed collapses into one summary row
    ("N seeds ▸", expandable) rather than listing every seed — there's no
    principled way to pick a "best" seed without ground truth (which isn't
@@ -71,9 +91,9 @@ stw gui --host 0.0.0.0       # bind beyond localhost (LAN-reachable — see note
    unused), so this narrows the table visually rather than choosing a
    winner for you. Below the table: an on-demand rendered class-average
    panel per job (central Z-slice per class — MRCs aren't browser-
-   displayable, so this is generated server-side, cached to disk on first
-   request; click any panel image to open it full-size in a new tab), the
-   cross-package comparison figure when at least two packages succeeded
+   displayable, so this is generated server-side, fresh on every request,
+   not cached — click any panel image to open it full-size in a new tab),
+   the cross-package comparison figure when at least two packages succeeded
    (also click-to-full-size — the underlying figure already scales with
    package/seed count, but a browser-shrunk `<img>` doesn't), and an "All
    class averages" grid showing every successful job's panel side by side

@@ -8,6 +8,7 @@ write a run report.
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from stw.adapters import get_adapter_for_mode
 from stw.compare import ComparisonReport, PackageLabels, build_comparison
 from stw.config import RunConfig
 from stw.masks.resolve import resolve_mask
+from stw.process import cancel_scope
 from stw.progress import NullSink, ProgressSink
 from stw.requirements import PackageReport
 from stw.results import PackageResult
@@ -29,6 +31,8 @@ class RunReport:
     preflight: list[dict] = field(default_factory=list)
     results: list[dict] = field(default_factory=list)
     comparison: dict | None = None
+    n_particles_total: int | None = None
+    n_particles_used: int | None = None
 
     def write(self, out_dir: str | Path) -> None:
         out = Path(out_dir)
@@ -38,6 +42,12 @@ class RunReport:
 
     def _render_summary(self) -> str:
         lines = [f"# stw run report (stw {self.stw_version})", ""]
+        if self.n_particles_total is not None and self.n_particles_used != self.n_particles_total:
+            lines.append(
+                f"Subsampled to {self.n_particles_used}/{self.n_particles_total} particles "
+                f"(seed={self.config.get('subsample_seed', 0)})."
+            )
+            lines.append("")
         lines.append("## Packages")
         for r in self.results:
             status = r["status"]
@@ -63,10 +73,23 @@ class RunReport:
         return "\n".join(lines) + "\n"
 
 
-def run_config(config: RunConfig, *, progress: ProgressSink | None = None, dry_run: bool = False) -> RunReport:
+def run_config(
+    config: RunConfig,
+    *,
+    progress: ProgressSink | None = None,
+    dry_run: bool = False,
+    cancel_flags: dict[str, threading.Event] | None = None,
+) -> RunReport:
+    """`cancel_flags`: optional {package: Event}, one entry per package a caller
+    wants to be able to cancel mid-run (the GUI sets one per requested package;
+    the CLI never passes this, so every CLI run stays uncancellable and behaves
+    exactly as before -- see process.cancel_scope/JobCancelled)."""
     sink = progress or NullSink()
 
     particles = ParticleSet.discover(config.particles, config.pattern, config.pixel_size)
+    n_particles_total = len(particles)
+    if config.subsample is not None:
+        particles = particles.subsample(config.subsample, config.subsample_seed)
 
     mask_spec = MaskSpec(
         kind=config.mask.kind, path=config.mask.path, center=config.mask.center,
@@ -102,9 +125,20 @@ def run_config(config: RunConfig, *, progress: ProgressSink | None = None, dry_r
         adapter_cls = get_adapter_for_mode(package, config.mode)
         report = adapter_cls.check_installed()
         preflight.append(report)
+        cancel_event = (cancel_flags or {}).get(package)
 
         for k in config.k_values:
             for seed in config.seed_values:
+                # Checked before doing any work, not just before adapter.run() --
+                # catches a package cancelled while still queued behind an
+                # earlier one (jobs run strictly sequentially within one
+                # run_config() call), not just one killed mid-subprocess.
+                if cancel_event is not None and cancel_event.is_set():
+                    results.append(PackageResult(
+                        package=adapter_cls.name, k=k, seed=seed, status="cancelled",
+                    ))
+                    continue
+
                 if not report.installed:
                     if config.on_missing_requirement == "fail":
                         raise RuntimeError(f"{package}: missing requirements — {report.to_dict()}")
@@ -143,7 +177,15 @@ def run_config(config: RunConfig, *, progress: ProgressSink | None = None, dry_r
                     ))
                     continue
 
-                result = adapter.run(job, progress=sink)
+                with cancel_scope(cancel_event):
+                    result = adapter.run(job, progress=sink)
+                # A killed subprocess surfaces as an ordinary status='failed' PackageResult
+                # (every adapter's run() catches JobCancelled via its own broad `except
+                # Exception` -- see process.JobCancelled's docstring); reclassify it here,
+                # the one place that actually knows cancellation was requested, rather than
+                # touching every adapter's exception handling.
+                if result.status == "failed" and cancel_event is not None and cancel_event.is_set():
+                    result.status = "cancelled"
                 result.warnings.extend(warnings)
                 results.append(result)
 
@@ -160,6 +202,8 @@ def run_config(config: RunConfig, *, progress: ProgressSink | None = None, dry_r
         preflight=[p.to_dict() for p in preflight],
         results=[r.to_dict() for r in results],
         comparison=comparison.to_dict() if comparison else None,
+        n_particles_total=n_particles_total,
+        n_particles_used=len(particles),
     )
     if not dry_run:
         report.write(out_dir)

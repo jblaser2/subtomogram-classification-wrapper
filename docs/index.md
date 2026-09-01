@@ -5,11 +5,12 @@ config**, and get class averages plus a cross-package comparison matrix back
 — without installing and learning each package's own CLI, file formats, and
 quirks one at a time.
 
-!!! note "Status: early development (pre-v0.1)"
+!!! note "Status: v0.1.0 released"
     The core library, HAC Baseline, three dependency-free `mode: preview`
-    adapters, and two real native packages (EMAN2, PyTom — both verified
-    end-to-end against real installs, including inside a container image)
-    all work today. See the [roadmap](https://github.com/jblaser2/subtomogram-classification-wrapper/blob/main/ROADMAP.md)
+    adapters, and eight real native packages (EMAN2, PyTom, RELION, PEET,
+    ProTomo, Dynamo, DISCA, STOPGAP — all verified end-to-end against real
+    installs) all work today, plus a local web GUI (`stw gui`) and `stw align`
+    for roughly-aligned input. See the [roadmap](https://github.com/jblaser2/subtomogram-classification-wrapper/blob/main/ROADMAP.md)
     for what's next.
 
 ## Why
@@ -60,5 +61,5 @@ approximations).
 pip install subtomogram-classification-wrapper
 ```
 
-(Not yet published — see [publishing](publishing.md) for the current state.
-For now, install from a clone: `pip install -e ".[dev]"`.)
+Developing on `stw` itself? Install from a clone instead: `pip install -e ".[dev]"`
+— see [publishing](publishing.md) for how releases are built and published.

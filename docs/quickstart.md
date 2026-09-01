@@ -1,7 +1,7 @@
 # Quickstart
 
 ```console
-pip install -e ".[dev,viz]"      # from a clone, during early development
+pip install "subtomogram-classification-wrapper[viz]"
 stw init                          # writes stw_config.yaml
 ```
 

@@ -4,7 +4,7 @@ Run subtomogram classification across many cryoET packages with **one config**, 
 class averages + a cross-package comparison matrix back — without installing and learning
 each package's own CLI, file formats, and quirks one at a time.
 
-> **Status: early development (pre-v0.1).** The core library, HAC Baseline, three
+> **Status: v0.1.0 released.** The core library, HAC Baseline, three
 > dependency-free `mode: preview` adapters (`dynamo-preview`/`pytom-preview`/`protomo-preview`),
 > and eight real native packages (**EMAN2**, **PyTom**, **RELION**, **PEET**, **ProTomo**,
 > **Dynamo**, **DISCA**, **STOPGAP** — all verified end-to-end against real installs) all work — try
@@ -59,10 +59,37 @@ $ stw run config.yaml       # runs every requested package, writes class average
 ## Installation
 
 ```console
-pip install -e ".[dev]"      # from a clone, while in early development
+pip install subtomogram-classification-wrapper
 ```
 
-(Not yet on PyPI — see [`docs/publishing.md`](docs/publishing.md).)
+Then confirm it worked:
+
+```console
+stw version
+stw --help
+```
+
+Prefer a GUI over YAML? Install the `gui` extra instead, then run `stw gui`:
+
+```console
+pip install "subtomogram-classification-wrapper[gui]"
+stw gui
+```
+
+That starts a local web app (like launching `napari` from the terminal) covering the
+same config, package picker, and live progress the CLI has. See
+[`docs/gui.md`](docs/gui.md).
+
+**Developing on `stw` itself?** Clone the repo and install in editable mode instead:
+
+```console
+git clone https://github.com/jblaser2/subtomogram-classification-wrapper
+cd subtomogram-classification-wrapper
+pip install -e ".[dev]"
+```
+
+(See [`docs/publishing.md`](docs/publishing.md) for how releases themselves get built and
+published.)
 
 Packages themselves are a separate story — see `stw check-env` and `docs/install/`.
 Some packages (EMAN2, PyTom, DISCA) are conda-installable via `conda env create -f envs/<pkg>.yml`
@@ -71,10 +98,6 @@ a prebuilt image with both already set up is available too, see [`docker/README.
 Others (RELION, PEET, Dynamo, STOPGAP, ProTomo) have no conda/pip path at all — a from-source
 build, IMOD, a MATLAB license, or a closed compiled binary — that `stw` can only detect and
 guide you through, not install for you.
-
-Prefer a GUI over YAML? `pip install ".[gui]"` then `stw gui` — a local web app (like
-launching `napari` from the terminal) covering the same config, package picker, and live
-progress the CLI has. See [`docs/gui.md`](docs/gui.md).
 
 ## Documentation
 

@@ -6,6 +6,7 @@ end-to-end test should match.
 """
 import csv
 import os
+import threading
 
 from stw.config import RunConfig
 from stw.orchestrator import run_config
@@ -177,3 +178,70 @@ def test_different_particle_sets_sharing_out_dir_get_distinct_caches(tiny_fixtur
 
     fingerprint_dirs = [d for d in (out_dir / "hac" / "_cache").iterdir() if d.is_dir()]
     assert len(fingerprint_dirs) == 2  # one per distinct particle set, not reused
+
+
+def test_subsample_caps_particle_count(tiny_fixture_dir, tmp_path):
+    """The tiny fixture has 32 particles; capping to 10 should classify only 10,
+    keep a separate cache from the full-32 run, and record both counts on the
+    report so a user can see what actually ran."""
+    out_dir = tmp_path / "out"
+    cfg = RunConfig.model_validate({
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "k": 2,
+        "mask": {"kind": "auto"}, "packages": ["hac"], "out_dir": str(out_dir),
+        "subsample": 10, "subsample_seed": 3,
+    })
+    report = run_config(cfg)
+
+    assert report.n_particles_total == 32
+    assert report.n_particles_used == 10
+    result = report.results[0]
+    assert result["status"] == "ok"
+    assert sum(result["n_per_class"].values()) == 10
+
+    fingerprint_dirs = [d for d in (out_dir / "hac" / "_cache").iterdir() if d.is_dir()]
+    assert len(fingerprint_dirs) == 1  # only the subsampled run happened
+
+
+def test_subsample_larger_than_dataset_uses_everything(tiny_fixture_dir, tmp_path):
+    out_dir = tmp_path / "out"
+    cfg = RunConfig.model_validate({
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "k": 2,
+        "mask": {"kind": "auto"}, "packages": ["hac"], "out_dir": str(out_dir),
+        "subsample": 10_000,
+    })
+    report = run_config(cfg)
+    assert report.n_particles_total == 32
+    assert report.n_particles_used == 32
+
+
+def test_cancel_flag_set_before_start_skips_the_package(tiny_fixture_dir, tmp_path):
+    """Regression test for the GUI's per-package Cancel button: a package whose
+    cancel_event is already set before its turn comes up (e.g. cancelled while
+    still queued behind an earlier package) must be skipped outright, not run
+    and then discarded -- no predictions.csv should even be written."""
+    out_dir = tmp_path / "out"
+    cfg = RunConfig.model_validate({
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "k": 2,
+        "mask": {"kind": "auto"}, "packages": ["hac"], "out_dir": str(out_dir),
+    })
+    already_cancelled = threading.Event()
+    already_cancelled.set()
+
+    report = run_config(cfg, cancel_flags={"hac": already_cancelled})
+
+    assert report.results[0]["status"] == "cancelled"
+    assert not (out_dir / "hac" / "k2" / "seed01" / "predictions.csv").exists()
+
+
+def test_cancel_flag_for_a_different_package_does_not_affect_this_one(tiny_fixture_dir, tmp_path):
+    out_dir = tmp_path / "out"
+    cfg = RunConfig.model_validate({
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "k": 2,
+        "mask": {"kind": "auto"}, "packages": ["hac"], "out_dir": str(out_dir),
+    })
+    unrelated = threading.Event()
+    unrelated.set()
+
+    report = run_config(cfg, cancel_flags={"some_other_package": unrelated})
+
+    assert report.results[0]["status"] == "ok"

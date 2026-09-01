@@ -29,6 +29,7 @@ def auto_sphere_mask(
     enclose: float = 0.90,
     pad: float = 4.0,
     edge: float = 3.0,
+    avg: np.ndarray | None = None,
 ) -> tuple[np.ndarray, Vec3, float]:
     """Build a blind sphere mask centered on (or near) the box center, sized to
     enclose most of the particle's density envelope.
@@ -36,8 +37,12 @@ def auto_sphere_mask(
     `center_mode="box"` assumes aligned input (the common case here); `"com"`
     centers on the envelope's center of mass instead, useful for `rough`-aligned
     input where a box-centered mask risks clipping real signal.
+
+    `avg`: pass an already-computed global average to skip re-streaming every
+    particle off disk (e.g. a caller that already has one cached).
     """
-    avg = global_average(particles.particle_dir, list(particles.files))
+    if avg is None:
+        avg = global_average(particles.particle_dir, list(particles.files))
     box = avg.shape[0]
     shape: Shape = (box, box, box)
     display = _znorm(avg)

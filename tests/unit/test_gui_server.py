@@ -21,6 +21,21 @@ def client():
     return TestClient(create_app())
 
 
+def _wait_for_preview(client, preview_id):
+    """/api/preview and /api/preview-mask run as a background job (progress-bar
+    support, see _throttled_progress in stw.gui.server) -- drain its SSE stream
+    to completion, then fetch the result. Returns (status_code, body_or_detail)."""
+    with client.stream("GET", f"/api/preview/{preview_id}/events") as resp:
+        assert resp.status_code == 200
+        for line in resp.iter_lines():
+            if line.startswith("data: ") and '"preview_complete"' in line:
+                break
+    res = client.get(f"/api/preview/{preview_id}/result")
+    if res.status_code != 200:
+        return res.status_code, res.json()["detail"]
+    return res.status_code, res.json()
+
+
 def test_list_packages_includes_hac_and_capabilities(client):
     res = client.get("/api/packages")
     assert res.status_code == 200
@@ -73,6 +88,68 @@ def test_report_not_ready_while_running_returns_409_or_completes(client, tiny_fi
     run_id = res.json()["run_id"]
     res = client.get(f"/api/runs/{run_id}/report")
     assert res.status_code in (200, 409)
+
+
+def test_start_run_creates_a_cancel_flag_per_package(client, tiny_fixture_dir, tmp_path):
+    from stw.gui.server import RUNS
+
+    body = {
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "pixel_size": 5.0,
+        "k": 2, "seeds": 1, "mask": {"kind": "sphere", "radius": 9.0},
+        "packages": ["hac"], "out_dir": str(tmp_path / "out"),
+    }
+    res = client.post("/api/runs", json=body)
+    assert res.status_code == 200
+    d = res.json()
+    assert d["packages"] == ["hac"]
+
+    state = RUNS[d["run_id"]]
+    assert "hac" in state.cancel_flags
+    assert not state.cancel_flags["hac"].is_set()
+
+
+def test_cancel_endpoint_sets_the_matching_event(client, tiny_fixture_dir, tmp_path):
+    from stw.gui.server import RUNS
+
+    body = {
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "pixel_size": 5.0,
+        "k": 2, "seeds": 1, "mask": {"kind": "sphere", "radius": 9.0},
+        "packages": ["hac"], "out_dir": str(tmp_path / "out"),
+    }
+    run_id = client.post("/api/runs", json=body).json()["run_id"]
+
+    res = client.post(f"/api/runs/{run_id}/cancel/hac")
+    assert res.status_code == 200
+    assert res.json() == {"cancelled": "hac"}
+    assert RUNS[run_id].cancel_flags["hac"].is_set()
+
+    # drain the run so it doesn't linger as a background thread past the test
+    with client.stream("GET", f"/api/runs/{run_id}/events") as resp:
+        for line in resp.iter_lines():
+            if line.startswith("data: ") and '"run_complete"' in line:
+                break
+
+
+def test_cancel_endpoint_404s_for_unknown_run_id(client):
+    res = client.post("/api/runs/does-not-exist/cancel/hac")
+    assert res.status_code == 404
+
+
+def test_cancel_endpoint_404s_for_a_package_not_in_the_run(client, tiny_fixture_dir, tmp_path):
+    body = {
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "pixel_size": 5.0,
+        "k": 2, "seeds": 1, "mask": {"kind": "sphere", "radius": 9.0},
+        "packages": ["hac"], "out_dir": str(tmp_path / "out"),
+    }
+    run_id = client.post("/api/runs", json=body).json()["run_id"]
+
+    res = client.post(f"/api/runs/{run_id}/cancel/eman2")
+    assert res.status_code == 404
+
+    with client.stream("GET", f"/api/runs/{run_id}/events") as resp:
+        for line in resp.iter_lines():
+            if line.startswith("data: ") and '"run_complete"' in line:
+                break
 
 
 def test_full_run_via_http_api(client, tiny_fixture_dir, tmp_path):
@@ -200,7 +277,11 @@ def test_preview_dataset_returns_specs_and_png(client, tiny_fixture_dir):
         "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "pixel_size": 5.0,
     })
     assert res.status_code == 200
-    d = res.json()
+    preview_id = res.json()["preview_id"]
+    assert res.json()["n_particles"] == 32
+
+    status, d = _wait_for_preview(client, preview_id)
+    assert status == 200
     assert d["n_particles"] == 32
     assert d["box"] == 24
     assert d["pixel_size"] == 5.0
@@ -226,12 +307,85 @@ def test_preview_mask_returns_specs_and_png(client, tiny_fixture_dir, mask):
         "mask": mask,
     })
     assert res.status_code == 200
-    d = res.json()
+    preview_id = res.json()["preview_id"]
+
+    status, d = _wait_for_preview(client, preview_id)
+    assert status == 200
     assert d["n_particles"] == 32
     assert len(d["preview_png_base64"]) > 0
 
 
+def test_preview_dataset_emits_progress_events(client, tiny_fixture_dir):
+    """The GUI's dataset-preview progress bar depends on real "progress" SSE
+    events (done/total), not just a final result -- see _throttled_progress."""
+    import stw.gui.server as server_module
+
+    # Other tests share this exact fixture/pattern/pixel-size fingerprint and may
+    # have already warmed the cache -- a cache hit skips global_average() (and
+    # therefore progress_cb) entirely, so force a cold start here.
+    server_module._GLOBAL_AVG_CACHE.clear()
+    server_module._GLOBAL_AVG_CACHE_ORDER.clear()
+
+    res = client.post("/api/preview", json={
+        "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "pixel_size": 5.0,
+    })
+    preview_id = res.json()["preview_id"]
+
+    events = []
+    with client.stream("GET", f"/api/preview/{preview_id}/events") as resp:
+        for line in resp.iter_lines():
+            if not line.startswith("data: "):
+                continue
+            evt = json.loads(line[len("data: "):])
+            events.append(evt)
+            if evt["event"] == "preview_complete":
+                break
+
+    progress_events = [e for e in events if e["event"] == "progress"]
+    assert progress_events, "no progress events emitted"
+    assert progress_events[-1]["payload"]["done"] == 32
+    assert progress_events[-1]["payload"]["total"] == 32
+    assert events[-1]["event"] == "preview_complete"
+    assert events[-1]["payload"]["status"] == "done"
+
+
+def test_preview_mask_reuses_dataset_preview_global_average(client, tiny_fixture_dir, monkeypatch):
+    """Regression test: previewing the mask right after previewing the dataset
+    (or vice versa) must not re-stream the whole particle set off disk a second
+    time -- see _cached_global_average(), keyed on ParticleSet.fingerprint()."""
+    import stw.gui.server as server_module
+
+    # The cache is a module-level dict shared across tests in this session (same
+    # story as RUNS/ALIGNS) -- other tests reuse this exact fixture/pattern/pixel
+    # size combo, so clear it first to guarantee a cold start here.
+    server_module._GLOBAL_AVG_CACHE.clear()
+    server_module._GLOBAL_AVG_CACHE_ORDER.clear()
+
+    calls = []
+    real_global_average = server_module.global_average
+
+    def counting_global_average(*args, **kwargs):
+        calls.append(1)
+        return real_global_average(*args, **kwargs)
+
+    monkeypatch.setattr(server_module, "global_average", counting_global_average)
+
+    body = {"particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc", "pixel_size": 5.0}
+    res1 = client.post("/api/preview", json=body)
+    status1, _ = _wait_for_preview(client, res1.json()["preview_id"])
+    assert status1 == 200
+    assert len(calls) == 1
+
+    res2 = client.post("/api/preview-mask", json={**body, "mask": {"kind": "sphere", "radius": 9.0}})
+    status2, _ = _wait_for_preview(client, res2.json()["preview_id"])
+    assert status2 == 200
+    assert len(calls) == 1, "mask preview recomputed the global average instead of reusing the cache"
+
+
 def test_preview_mask_rejects_missing_required_params(client, tiny_fixture_dir):
+    # Fails synchronously (422, no preview_id) -- _validate_mask_body() runs
+    # before any background job starts, so a typo'd mask form doesn't need an
+    # SSE round trip just to report itself.
     res = client.post("/api/preview-mask", json={
         "particles": str(tiny_fixture_dir), "pattern": "particle_*.mrc",
         "mask": {"kind": "sphere"},
@@ -265,8 +419,12 @@ def test_preview_mask_center_override_actually_shifts_the_mask(client, tiny_fixt
     })
     assert res_centered.status_code == 200
     assert res_offcenter.status_code == 200
-    png_centered = base64.b64decode(res_centered.json()["preview_png_base64"])
-    png_offcenter = base64.b64decode(res_offcenter.json()["preview_png_base64"])
+    status_centered, d_centered = _wait_for_preview(client, res_centered.json()["preview_id"])
+    status_offcenter, d_offcenter = _wait_for_preview(client, res_offcenter.json()["preview_id"])
+    assert status_centered == 200
+    assert status_offcenter == 200
+    png_centered = base64.b64decode(d_centered["preview_png_base64"])
+    png_offcenter = base64.b64decode(d_offcenter["preview_png_base64"])
     assert png_centered != png_offcenter
 
     # sanity-check the underlying primitive directly too (isolates GUI plumbing

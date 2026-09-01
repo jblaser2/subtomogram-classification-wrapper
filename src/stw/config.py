@@ -36,6 +36,8 @@ class RunConfig(BaseModel):
     particles: Path
     pattern: str = "*.mrc"
     pixel_size: float | None = None
+    subsample: int | None = None  # cap particle count via a random draw -- see ParticleSet.subsample()
+    subsample_seed: int = 0
     k: int | list[int] = 2
     mask: MaskConfig = Field(default_factory=MaskConfig)
     wedge: WedgeConfig = Field(default_factory=WedgeConfig)
@@ -54,6 +56,13 @@ class RunConfig(BaseModel):
     def _non_empty_packages(cls, v: list[str]) -> list[str]:
         if not v:
             raise ValueError("packages must list at least one package name")
+        return v
+
+    @field_validator("subsample")
+    @classmethod
+    def _valid_subsample(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError(f"subsample must be >= 1, got {v}")
         return v
 
     @field_validator("k")

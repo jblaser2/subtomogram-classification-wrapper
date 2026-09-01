@@ -53,4 +53,8 @@ every tag push either way.
 
 Bump `version` in `pyproject.toml` before tagging — this project doesn't yet
 use a git-tag-derived versioning scheme (e.g. `hatch-vcs`), so the two must
-be kept in sync manually for now.
+be kept in sync manually for now. There is a second copy to update too:
+`src/stw/__init__.py`'s `__version__` (used by `stw --version` and stamped
+into every `run_report.json` as `stw_version`) is a separate string, not
+derived from package metadata — `tests/unit/test_version.py` fails the build
+if the two ever drift.

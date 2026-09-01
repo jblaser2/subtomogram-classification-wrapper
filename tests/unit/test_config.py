@@ -63,6 +63,25 @@ def test_seed_values_from_int_vs_list():
     assert cfg2.seed_values == [5, 7]
 
 
+def test_subsample_defaults_to_none():
+    cfg = RunConfig.model_validate(_base())
+    assert cfg.subsample is None
+    assert cfg.subsample_seed == 0
+
+
+def test_subsample_zero_or_negative_rejected():
+    with pytest.raises(ValidationError):
+        RunConfig.model_validate(_base(subsample=0))
+    with pytest.raises(ValidationError):
+        RunConfig.model_validate(_base(subsample=-10))
+
+
+def test_subsample_positive_accepted():
+    cfg = RunConfig.model_validate(_base(subsample=500, subsample_seed=7))
+    assert cfg.subsample == 500
+    assert cfg.subsample_seed == 7
+
+
 def test_roundtrip_yaml(tmp_path):
     p = tmp_path / "cfg.yaml"
     p.write_text("particles: ./p\npackages: [hac]\nk: 3\n")

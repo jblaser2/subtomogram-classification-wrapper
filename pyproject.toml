@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "subtomogram-classification-wrapper"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Run subtomogram classification across many cryoET packages with one config, and compare the results."
 readme = "README.md"
 license = "MIT"

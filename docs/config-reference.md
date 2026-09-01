@@ -8,6 +8,8 @@
 | `particles` | path | required | Directory of same-box-size, same-pixel-size MRC particles |
 | `pattern` | str | `*.mrc` | Glob within `particles` |
 | `pixel_size` | float \| null | auto-detected | Required if MRC headers don't agree, are missing, or are left at 1.0 Å/px |
+| `subsample` | int \| null | `null` | Caps particle count via a random, seeded draw — see `ParticleSet.subsample()`. Useful for a real-world download with tens of thousands of particles, where classifying everything with every package isn't practical for a first pass |
+| `subsample_seed` | int | `0` | Seeds the draw above, for a reproducible subset |
 | `k` | int \| list[int] | `2` | One or more class counts to run |
 | `mask.kind` | `none`\|`sphere`\|`cylinder`\|`file`\|`auto` | `auto` | `auto` = blind density-envelope sphere, no labels needed — see `docs/mask-design.md` |
 | `mask.radius`, `mask.half_height`, `mask.axis`, `mask.center`, `mask.edge` | — | — | Required fields depend on `mask.kind` — see `MaskConfig` and `docs/mask-design.md` |
